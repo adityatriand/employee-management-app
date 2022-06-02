@@ -19,7 +19,7 @@
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
-    <link href={{ assets('open-iconic/font/css/open-iconic-bootstrap.css') }} rel="stylesheet">
+    <link href={{ asset('open-iconic/font/css/open-iconic-bootstrap.css') }} rel="stylesheet">
 </head>
 
 <body class="h-100">
