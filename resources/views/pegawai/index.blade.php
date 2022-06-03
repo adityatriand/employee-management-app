@@ -37,9 +37,9 @@
                 <td>{{ $data['nama_jabatan'] }}</td>
                 <td>{{ $data['keterangan'] }}</td>
                 <td>
-                    <a class="btn btn-sm btn-info" href="{{ route('jabatan.edit', $data['id_jabatan']) }}"><i
+                    <a class="btn btn-sm btn-info" href="{{ route('pegawai.edit', $data['id_pegawai']) }}"><i
                             class="oi oi-pencil"></i> Edit </a>
-                    <form action="{{ route('jabatan.destroy', $data['id_jabatan']) }}" class="d-inline" method="POST">
+                    <form action="{{ route('pegawai.destroy', $data['id_pegawai']) }}" class="d-inline" method="POST">
                         @method('DELETE')
                         @csrf
                         <button type="submit" class="btn btn-sm btn-danger"><i class="oi oi-trash"></i> Hapus </button>
