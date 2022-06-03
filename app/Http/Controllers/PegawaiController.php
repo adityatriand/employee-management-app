@@ -57,7 +57,7 @@ class PegawaiController extends Controller
         if($request->hasFile('foto')){
             $file = $request->file('foto');
             $namaFile = time().$file->getClientOriginalName();
-            $file->move(url().'/images/', $namaFile);
+            $file->move(url('/').'images/', $namaFile);
         }
 
         $pegawai = new Pegawai();
@@ -130,7 +130,7 @@ class PegawaiController extends Controller
         if($request->hasFile('foto')){
             $file = $request->file('foto');
             $namaFile = time().$file->getClientOriginalName();
-            $file->move(url().'/images/', $namaFile);
+            $file->move(url('/').'images/', $namaFile);
             $ubahfile = true;
         }
 
@@ -141,7 +141,7 @@ class PegawaiController extends Controller
         $pegawai->id_jabatan = $request['jabatan'];
         $pegawai->keterangan = $request['keterangan'];
         if($ubahfile){
-            unlink(url().'/images/'.$pegawai->foto);
+            unlink(url('/').'images/'.$pegawai->foto);
             $pegawai->foto = $namaFile;
         }
         $pegawai->update();
@@ -160,7 +160,7 @@ class PegawaiController extends Controller
     {
         $pegawai = Pegawai::find($id);
         $pegawai->delete();
-        unlink(url().'/images/'.$pegawai->foto);
+        unlink(url('/').'images/'.$pegawai->foto);
 
         return redirect()
             ->route('pegawai.index')

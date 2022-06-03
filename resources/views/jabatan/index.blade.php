@@ -29,7 +29,7 @@
                     <a class="btn btn-sm btn-info" href="{{ route('jabatan.edit', $data['id_jabatan']) }}"><i
                             class="oi oi-pencil"></i> Edit </a>
                     <form action="{{ route('jabatan.destroy', $data['id_jabatan']) }}" class="d-inline" method="POST">
-                        @method('DELETTE')
+                        @method('DELETE')
                         @csrf
                         <button type="submit" class="btn btn-sm btn-danger"><i class="oi oi-trash"></i> Hapus </button>
                     </form>
