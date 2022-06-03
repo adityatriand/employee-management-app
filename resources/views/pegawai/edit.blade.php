@@ -68,7 +68,7 @@
     <div class="form-group row">
         <label for="keterangan" class="col-sm-2 col-form-label">Keterangan</label>
         <div class="col-sm-8">
-            <textarea name="keterangan" id="keterangan" class="form-control"></textarea>
+            <textarea name="keterangan" id="keterangan" class="form-control">{{ $pegawai['keterangan'] }}</textarea>
         </div>
     </div>
     <button type="submit" class="btn btn-info"><i class="oi oi-task"></i> Simpan</button>
