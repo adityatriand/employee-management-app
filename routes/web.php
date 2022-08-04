@@ -12,5 +12,9 @@ Route::group(['middleware'=>'auth'], function(){
     Route::get('/home', [App\Http\Controllers\HomeController::class, 'index']);
     Route::resource('jabatan',Controllers\JabatanController::class);
     Route::resource('pegawai',Controllers\PegawaiController::class);
+
+    Route::get('admin', function(){
+        echo 'Selamat Datang admin!';
+    })->middleware('cekLevel');
 });
 
