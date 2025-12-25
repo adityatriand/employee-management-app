@@ -25,7 +25,7 @@
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
-    <link href="{{ asset('css/custom.css') }}" rel="stylesheet">
+    <link href="{{ mix('css/custom.css') }}" rel="stylesheet">
     <link href="{{ asset('open-iconic/font/css/open-iconic-bootstrap.css') }}" rel="stylesheet">
 </head>
 
@@ -64,6 +64,12 @@
                     <span>Manajemen File</span>
                 </a>
             </div>
+            <div class="nav-item">
+                <a class="nav-link {{ request()->routeIs('assets.*') ? 'active' : '' }}" href="{{ route('assets.index') }}">
+                    <i class="oi oi-box"></i>
+                    <span>Manajemen Aset</span>
+                </a>
+            </div>
             @if(auth()->user()->level == 1)
             <div class="nav-item">
                 <div class="nav-divider"></div>
@@ -87,6 +93,12 @@
                 <a class="nav-link" href="{{ route('positions.create') }}">
                     <i class="oi oi-plus"></i>
                     <span>Tambah Jabatan</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="{{ route('assets.create') }}">
+                    <i class="oi oi-plus"></i>
+                    <span>Tambah Aset</span>
                 </a>
             </div>
             @endif

@@ -249,8 +249,60 @@
     </div>
 </div>
 
-<!-- Activity Log Section -->
-<div class="card mt-4">
+            <!-- Assets Section -->
+            <div class="card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="oi oi-box"></i> Aset yang Ditugaskan
+                    </h5>
+                    @if(auth()->user()->level == 1)
+                    <a href="{{ route('assets.create', ['employee_id' => $employee->id]) }}" class="btn btn-sm btn-success">
+                        <i class="oi oi-plus"></i> Tugaskan Aset
+                    </a>
+                    @endif
+                </div>
+                <div class="card-body">
+                    @if($assets->count() > 0)
+                    <div class="row g-3">
+                        @foreach($assets as $asset)
+                        <div class="col-md-4">
+                            <div class="asset-card">
+                                <div class="asset-image">
+                                    <img src="{{ $asset->image_url }}" alt="{{ $asset->name }}" class="asset-thumbnail">
+                                </div>
+                                <div class="asset-info">
+                                    <h6 class="asset-name" title="{{ $asset->name }}">{{ \Illuminate\Support\Str::limit($asset->name, 25) }}</h6>
+                                    <small class="asset-tag"><code>{{ $asset->asset_tag ?? 'N/A' }}</code></small>
+                                    <div class="asset-meta">
+                                        <span class="badge bg-{{ $asset->status_color }}">{{ $asset->status_label }}</span>
+                                        <small class="text-muted d-block mt-1">{{ ucfirst($asset->asset_type) }}</small>
+                                    </div>
+                                </div>
+                                <div class="asset-actions">
+                                    <a href="{{ route('assets.show', $asset->id) }}" class="btn btn-sm btn-outline-primary" title="Detail">
+                                        <i class="oi oi-eye"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <div class="text-center py-4">
+                        <i class="oi oi-box" style="font-size: 3rem; color: #cbd5e1;"></i>
+                        <p class="mt-3 text-muted">Tidak ada aset yang ditugaskan ke pegawai ini.</p>
+                        @if(auth()->user()->level == 1)
+                        <a href="{{ route('assets.create', ['employee_id' => $employee->id]) }}" class="btn btn-success">
+                            <i class="oi oi-plus"></i> Tugaskan Aset Pertama
+                        </a>
+                        @endif
+                    </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Activity Log Section -->
+            <div class="card mt-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
             <i class="oi oi-clock"></i> Riwayat Aktivitas

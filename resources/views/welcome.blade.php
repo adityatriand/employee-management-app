@@ -18,7 +18,7 @@
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
-    <link href="{{ asset('css/custom.css') }}" rel="stylesheet">
+    <link href="{{ mix('css/custom.css') }}" rel="stylesheet">
     <link href="{{ asset('open-iconic/font/css/open-iconic-bootstrap.css') }}" rel="stylesheet">
 </head>
 
@@ -29,6 +29,10 @@
             <div class="landing-logo">
                 <img src="{{ asset('images/logo.png') }}" alt="WorkforceHub" class="landing-logo-img" onerror="this.style.display='none'">
                 <h1 class="landing-title">WorkforceHub</h1>
+            </div>
+            <div class="landing-attribution mb-4">
+                <img src="{{ asset('images/logo-arphidh.png') }}" alt="Arphidh" class="landing-attribution-logo" onerror="this.style.display='none';">
+                <p class="landing-description">by Arphidh</p>
             </div>
             <p class="landing-subtitle mb-2">
                 Sistem Terpusat untuk Manajemen Sumber Daya Organisasi
@@ -43,10 +47,6 @@
                 <a href="{{ route('register') }}" class="btn btn-outline-light btn-lg">
                     <i class="oi oi-person"></i> Daftar
                 </a>
-            </div>
-            <div class="landing-attribution">
-                <img src="{{ asset('images/logo-arphidh.png') }}" alt="Arphidh" class="landing-attribution-logo" onerror="this.style.display='none';">
-                <p class="landing-description">by Arphidh</p>
             </div>
         </div>
     </div>
