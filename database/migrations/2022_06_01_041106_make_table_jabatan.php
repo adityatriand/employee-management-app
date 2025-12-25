@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('jabatan', function(Blueprint $table){
+        Schema::create('positions', function(Blueprint $table){
             $table->increments('id');
             $table->string('name');
             $table->text('description')->nullable();
@@ -28,6 +28,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::drop('jabatan');
+        Schema::drop('positions');
     }
 };

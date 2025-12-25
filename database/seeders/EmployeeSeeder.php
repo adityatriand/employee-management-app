@@ -19,7 +19,7 @@ class EmployeeSeeder extends Seeder
         $faker = Faker::create('id_ID');
 
         // Get position IDs
-        $positionIds = DB::table('jabatan')->pluck('id')->toArray();
+        $positionIds = DB::table('positions')->pluck('id')->toArray();
 
         if (empty($positionIds)) {
             $this->command->warn('No positions found. Please run PositionSeeder first.');
@@ -31,7 +31,7 @@ class EmployeeSeeder extends Seeder
             $gender = $faker->randomElement(['L', 'P']);
             $genderName = $gender === 'L' ? 'male' : 'female';
 
-            DB::table('pegawai')->insert([
+            DB::table('employees')->insert([
                 'name' => $faker->name($genderName),
                 'gender' => $gender,
                 'birth_date' => $faker->date('Y-m-d', '-25 years', '-18 years'),

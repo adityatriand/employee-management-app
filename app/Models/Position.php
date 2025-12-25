@@ -10,7 +10,7 @@ class Position extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'jabatan';
+    protected $table = 'positions';
     protected $primaryKey = 'id';
     public $timestamps = true;
 

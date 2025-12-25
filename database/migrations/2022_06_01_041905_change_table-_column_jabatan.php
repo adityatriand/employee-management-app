@@ -15,8 +15,9 @@ return new class extends Migration
     {
         // This migration is no longer needed as description is now in the original migration
         // Keeping it for backward compatibility but making it safe
-        if (!Schema::hasColumn('jabatan', 'description')) {
-            Schema::table('jabatan', function(Blueprint $table){
+        $tableName = Schema::hasTable('positions') ? 'positions' : 'jabatan';
+        if (!Schema::hasColumn($tableName, 'description')) {
+            Schema::table($tableName, function(Blueprint $table){
                 $table->text('description')->nullable();
             });
         }

@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('pegawai',function(Blueprint $table){
+        Schema::create('employees',function(Blueprint $table){
             $table->increments('id');
             $table->string('name', 255);
             $table->string('gender', 1);
@@ -32,6 +32,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::drop('pegawai');
+        Schema::drop('employees');
     }
 };

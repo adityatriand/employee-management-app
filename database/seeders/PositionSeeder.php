@@ -30,7 +30,7 @@ class PositionSeeder extends Seeder
         ];
 
         foreach ($positions as $position) {
-            DB::table('jabatan')->insert([
+            DB::table('positions')->insert([
                 'name' => $position,
                 'description' => $faker->sentence(6),
                 'created_at' => now(),
