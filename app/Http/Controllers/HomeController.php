@@ -23,6 +23,14 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('home');
+        $user = auth()->user();
+        
+        // Admin dashboard (level 1)
+        if ($user->level == 1) {
+            return view('admin.dashboard');
+        }
+        
+        // Regular user dashboard (level 0)
+        return view('user.dashboard');
     }
 }
