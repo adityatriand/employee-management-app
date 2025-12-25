@@ -1,6 +1,6 @@
 # Employee Management Application
 
-A Laravel-based employee management system with authentication, job positions (Jabatan), and employee (Pegawai) management.
+A Laravel-based multi-tenant employee management system with workspace isolation, role-based access control, file management, and asset tracking.
 
 ## 📋 Table of Contents
 
@@ -12,16 +12,29 @@ A Laravel-based employee management system with authentication, job positions (J
 - [Running without Docker](#running-without-docker)
 - [Framework Version](#framework-version)
 - [Database Structure](#database-structure)
+- [API Documentation](#api-documentation)
 - [Usage](#usage)
 
 ## ✨ Features
 
-- User authentication (Login, Register, Password Reset)
-- Role-based access control (Admin level checking)
-- Job Position (Jabatan) management (CRUD)
-- Employee (Pegawai) management (CRUD)
-- Employee photo upload
-- Bootstrap 5 UI
+### Core Features
+- **Multi-tenant Workspace System**: Each organization has its own isolated workspace
+- **User Authentication**: Login, Register, Password Reset with workspace-specific URLs
+- **Role-Based Access Control**: Admin (level 1) and Regular User (level 0) roles
+- **Job Position Management**: Full CRUD operations for positions
+- **Employee Management**: Complete employee profiles with photos
+- **File Management**: Upload, organize, and track employee documents
+- **Asset Management**: Track company assets, assignments, and maintenance
+- **Activity Logging**: Comprehensive audit trail for all operations
+- **User Profile Editing**: Regular users can edit their own profile (limited fields)
+
+### Advanced Features
+- **MinIO Integration**: Object storage for files, photos, and assets
+- **RESTful API**: Laravel Sanctum-based API with token authentication
+- **Soft Deletes**: Recoverable deletion for all major entities
+- **Export Functionality**: PDF and Excel export for employee data
+- **Responsive UI**: Bootstrap 5 with modern, clean interface
+- **Workspace Branding**: Custom logos and names per workspace
 
 ## 📦 Requirements
 
@@ -39,8 +52,10 @@ A Laravel-based employee management system with authentication, job positions (J
 ## 🛠 Technology Stack
 
 - **Backend**: Laravel 9.52
-- **Frontend**: Bootstrap 5, Laravel Mix
+- **Frontend**: Bootstrap 5, Laravel Mix, Open Iconic
 - **Database**: MySQL 8.0
+- **Storage**: MinIO (S3-compatible object storage)
+- **API Authentication**: Laravel Sanctum
 - **PHP**: 8.2
 - **Web Server**: Nginx
 
@@ -316,23 +331,115 @@ If you want to upgrade to Laravel 11 in the future, you'll need to:
 
 ## 🗄 Database Structure
 
-### Tables:
-- `users` - User authentication
-- `jabatan` - Job positions
-- `pegawai` - Employees
-- `password_resets` - Password reset tokens
-- `failed_jobs` - Failed queue jobs
-- `personal_access_tokens` - API tokens
+### Core Tables:
+- `workspaces` - Multi-tenant workspace isolation
+- `users` - User authentication with workspace association
+- `positions` - Job positions (scoped to workspace)
+- `employees` - Employee profiles (scoped to workspace)
+- `files` - File uploads and documents (scoped to workspace)
+- `assets` - Company assets (scoped to workspace)
+- `asset_assignments` - Asset assignment history
+- `activity_logs` - Audit trail for all operations
 
 ### Key Relationships:
-- `pegawai.id_jabatan` → `jabatan.id_jabatan`
+- `users.workspace_id` → `workspaces.id`
+- `employees.workspace_id` → `workspaces.id`
+- `employees.position_id` → `positions.id`
+- `employees.user_id` → `users.id` (for regular user accounts)
+- `files.workspace_id` → `workspaces.id`
+- `files.employee_id` → `employees.id`
+- `assets.workspace_id` → `workspaces.id`
+- `assets.assigned_to` → `employees.id`
 
 ## 📝 Usage
 
-1. **Register/Login**: Create an account or login with existing credentials
-2. **Manage Job Positions**: Navigate to `/jabatan` to add, edit, or delete job positions
-3. **Manage Employees**: Navigate to `/pegawai` to add, edit, or delete employees
-4. **Admin Access**: Access `/admin` route (requires admin level)
+### For Administrators
+
+1. **Register Workspace**: Create a new account and set up your workspace
+2. **Manage Workspace**: Edit workspace name and logo from admin dashboard
+3. **Manage Positions**: Navigate to `/{workspace}/positions` to manage job positions
+4. **Manage Employees**: Navigate to `/{workspace}/employees` to manage employee profiles
+5. **File Management**: Upload and organize employee documents at `/{workspace}/files`
+6. **Asset Management**: Track and assign company assets at `/{workspace}/assets`
+7. **Activity Logs**: View audit trail at `/{workspace}/activity-logs`
+8. **Export Data**: Export employee data to PDF or Excel
+
+### For Regular Users
+
+1. **Login**: Use workspace-specific login URL provided by administrator
+2. **View Dashboard**: See your profile, assigned files, and assets
+3. **Edit Profile**: Update your name, gender, birthdate, and photo
+4. **View Files**: Access your assigned documents
+5. **View Assets**: See assets assigned to you
+
+### Workspace URLs
+
+- **Login**: `/{workspace-slug}/login`
+- **Dashboard**: `/{workspace-slug}/dashboard`
+- **Admin Dashboard**: `/{workspace-slug}/dashboard` (admin only)
+
+## 🔌 API Documentation
+
+### Authentication
+
+The API uses Laravel Sanctum for token-based authentication.
+
+#### Login
+```http
+POST /api/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password",
+  "workspace_slug": "my-workspace"
+}
+```
+
+#### Register
+```http
+POST /api/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "user@example.com",
+  "password": "password",
+  "password_confirmation": "password",
+  "workspace_name": "My Workspace"
+}
+```
+
+### Protected Routes
+
+All protected routes require the `Authorization: Bearer {token}` header.
+
+#### Get Authenticated User
+```http
+GET /api/user
+Authorization: Bearer {token}
+```
+
+#### Workspace-Scoped Routes
+
+All workspace routes are prefixed with `/api/workspaces/{workspace}`:
+
+- `GET /api/workspaces/{workspace}/employees` - List employees
+- `GET /api/workspaces/{workspace}/employees/{id}` - Get employee details
+- `GET /api/workspaces/{workspace}/positions` - List positions
+- `GET /api/workspaces/{workspace}/files` - List files
+- `GET /api/workspaces/{workspace}/assets` - List assets
+
+**Admin-only routes** (require admin level):
+- `POST /api/workspaces/{workspace}/employees` - Create employee
+- `PUT /api/workspaces/{workspace}/employees/{id}` - Update employee
+- `DELETE /api/workspaces/{workspace}/employees/{id}` - Delete employee
+- Similar patterns for positions, files, and assets
+
+### Role-Based Access
+
+- **Regular Users (level 0)**: Can only read their own data (automatically filtered)
+- **Admins (level 1)**: Full CRUD access to all resources in their workspace
 
 ## 🔧 Troubleshooting
 

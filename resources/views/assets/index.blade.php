@@ -37,7 +37,7 @@
                 @if(auth()->user()->level == 1)
                     <div class="col-md-6 text-end">
                         <button type="button" class="btn btn-outline-secondary" onclick="toggleFilters()">
-                            <i class="oi oi-failter"></i> Filter
+                            <i class="oi oi-filter"></i> Filter
                             @if($hasFilters)
                             <span class="badge bg-primary ms-2" id="filterCount">{{ $filterCount }}</span>
                             @endif
