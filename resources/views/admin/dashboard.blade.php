@@ -69,7 +69,7 @@
                 <div class="d-flex align-items-center">
                     <div class="flex-shrink-0">
                         <div class="bg-warning bg-opacity-10 rounded p-3">
-                            <i class="oi oi-trending-up text-warning" style="font-size: 2rem;"></i>
+                            <i class="oi oi-arrow-circle-top text-warning" style="font-size: 2rem;"></i>
                         </div>
                     </div>
                     <div class="flex-grow-1 ms-3">
@@ -95,27 +95,29 @@
 <div class="row mb-4">
     <!-- Employee Growth Chart -->
     <div class="col-md-8">
-        <div class="card">
+        <div class="card dashboard-chart-card">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="oi oi-graph"></i> Pertumbuhan Pegawai (12 Bulan Terakhir)
                 </h5>
             </div>
             <div class="card-body">
-                <canvas id="growthChart" height="80"></canvas>
+                <div class="growth-chart-container">
+                    <canvas id="growthChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Gender Distribution Chart -->
     <div class="col-md-4">
-        <div class="card">
+        <div class="card dashboard-chart-card">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="oi oi-pie-chart"></i> Distribusi Jenis Kelamin
                 </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body chart-container">
                 <canvas id="genderChart"></canvas>
             </div>
         </div>
@@ -126,27 +128,27 @@
 <div class="row mb-4">
     <!-- Position Distribution Chart -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card dashboard-chart-card">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="oi oi-briefcase"></i> Distribusi Jabatan
                 </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body chart-container">
                 <canvas id="positionChart"></canvas>
             </div>
         </div>
     </div>
-    
+
     <!-- Age Distribution Chart -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card dashboard-chart-card">
             <div class="card-header">
                 <h5 class="mb-0">
                     <i class="oi oi-bar-chart"></i> Distribusi Usia
                 </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body chart-container">
                 <canvas id="ageChart"></canvas>
             </div>
         </div>
@@ -155,7 +157,7 @@
 
 <!-- Welcome and Quick Actions -->
 <div class="row mb-4">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Selamat Datang, Administrator!</h5>
@@ -179,29 +181,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Aksi Cepat</h5>
-            </div>
-            <div class="card-body">
-                <div class="list-group list-group-flush">
-                    <a href="{{ route('employees.index') }}" class="list-group-item list-group-item-action">
-                        <i class="oi oi-list"></i> Lihat Semua Pegawai
-                    </a>
-                    <a href="{{ route('positions.index') }}" class="list-group-item list-group-item-action">
-                        <i class="oi oi-list"></i> Lihat Semua Jabatan
-                    </a>
-                    <a href="{{ route('employees.create') }}" class="list-group-item list-group-item-action">
-                        <i class="oi oi-plus"></i> Tambah Pegawai Baru
-                    </a>
-                    <a href="{{ route('positions.create') }}" class="list-group-item list-group-item-action">
-                        <i class="oi oi-plus"></i> Tambah Jabatan Baru
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+
 </div>
 
 <!-- Recent Employees -->
@@ -233,8 +213,8 @@
                         <td>{{ $index + 1 }}</td>
                         <td>
                             <a href="{{ route('employees.show', $employee->id) }}">
-                                <img src="{{ $employee->photo_url }}" 
-                                     alt="{{ $employee->name }}" 
+                                <img src="{{ $employee->photo_url }}"
+                                     alt="{{ $employee->name }}"
                                      class="employee-photo">
                             </a>
                         </td>
@@ -274,7 +254,7 @@
     const dangerColor = '#ef4444';
     const infoColor = '#06b6d4';
     const warningColor = '#f59e0b';
-    
+
     // Growth Chart (Line)
     const growthCtx = document.getElementById('growthChart').getContext('2d');
     new Chart(growthCtx, {
@@ -295,7 +275,7 @@
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: true,
@@ -312,7 +292,7 @@
             }
         }
     });
-    
+
     // Gender Distribution Chart (Pie)
     const genderCtx = document.getElementById('genderChart').getContext('2d');
     new Chart(genderCtx, {
@@ -328,15 +308,22 @@
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 8,
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
             }
         }
     });
-    
+
     // Position Distribution Chart (Doughnut)
     const positionCtx = document.getElementById('positionChart').getContext('2d');
     new Chart(positionCtx, {
@@ -360,15 +347,22 @@
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 8,
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
             }
         }
     });
-    
+
     // Age Distribution Chart (Bar)
     const ageCtx = document.getElementById('ageChart').getContext('2d');
     new Chart(ageCtx, {
@@ -385,7 +379,7 @@
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: false
