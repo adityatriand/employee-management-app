@@ -1,0 +1,33 @@
+/*!
+ * WorkforceHub Main Stylesheet
+ * 
+ * This file imports all CSS modules in the correct order.
+ * The modules are compiled into a single file by Laravel Mix.
+ */
+
+/* 1. Variables - Must be first */
+@import '_variables.css';
+
+/* 2. Base styles */
+@import '_base.css';
+
+/* 3. Layout components */
+@import '_sidebar.css';
+@import '_layout.css';
+
+/* 4. UI Components */
+@import '_components.css';
+@import '_forms.css';
+
+/* 5. Utilities */
+@import '_utilities.css';
+
+/* 6. Page-specific styles */
+@import '_pages.css';
+
+/* 7. Feature modules */
+@import '_modules.css';
+
+/* 8. Responsive and print styles - Must be last */
+@import '_responsive.css';
+

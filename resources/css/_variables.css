@@ -1,0 +1,15 @@
+:root {
+    /* Logo Color Palette */
+    --primary-color: #4988C4;
+    --primary-dark: #1C4D8D;
+    --primary-darker: #0F2854;
+    --primary-light: #BDE8F5;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #4988C4;
+    --dark-color: #0F2854;
+    --light-color: #f8fafc;
+    --sidebar-width: 260px;
+}

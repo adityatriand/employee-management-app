@@ -13,4 +13,16 @@ const mix = require('laravel-mix');
 
 mix.js('resources/js/app.js', 'public/js')
     .sass('resources/sass/app.scss', 'public/css')
+    .styles([
+        'resources/css/_variables.css',
+        'resources/css/_base.css',
+        'resources/css/_sidebar.css',
+        'resources/css/_layout.css',
+        'resources/css/_components.css',
+        'resources/css/_forms.css',
+        'resources/css/_utilities.css',
+        'resources/css/_pages.css',
+        'resources/css/_modules.css',
+        'resources/css/_responsive.css',
+    ], 'public/css/custom.css')
     .sourceMaps();
