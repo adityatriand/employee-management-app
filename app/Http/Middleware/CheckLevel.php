@@ -6,7 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class CekLevel
+class CheckLevel
 {
     /**
      * Handle an incoming request.
@@ -17,9 +17,10 @@ class CekLevel
      */
     public function handle(Request $request, Closure $next)
     {
-        if((!Auth::guest()) && (Auth::user()->level==1)){
+        if ((!Auth::guest()) && (Auth::user()->level == 1)) {
             return $next($request);
         }
         return redirect('/');
     }
 }
+
