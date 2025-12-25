@@ -23,6 +23,7 @@ up: ## Start the container
 	@echo "$(GREEN)Container started! Waiting for services...$(RESET)"
 	@sleep 5
 	@echo "$(GREEN)Check logs with: make logs$(RESET)"
+	@echo "$(YELLOW)Note: Run 'make minio-setup' to create MinIO bucket$(RESET)"
 
 down: ## Stop the container
 	@echo "$(GREEN)Stopping container...$(RESET)"
@@ -35,7 +36,11 @@ build: ## Build the Docker image
 rebuild: ## Rebuild the Docker image from scratch
 	@echo "$(GREEN)Rebuilding Docker image (no cache)...$(RESET)"
 	docker-compose build --no-cache
-	@echo "$(GREEN)Image rebuilt! Start with: make up$(RESET)"
+	@echo "$(GREEN)Image rebuilt! Starting containers...$(RESET)"
+	@make up
+	@sleep 10
+	@make minio-setup || true
+	@echo "$(GREEN)Rebuild complete!$(RESET)"
 
 restart: ## Restart the container
 	@echo "$(GREEN)Restarting container...$(RESET)"
@@ -154,7 +159,37 @@ cache-config: ## Cache configuration
 	@echo "$(GREEN)Caching configuration...$(RESET)"
 	docker-compose exec -T app php artisan config:cache
 
-install: ## Full installation (dependencies + key + migrate)
+minio-setup: ## Setup MinIO bucket (creates bucket if not exists)
+	@echo "$(GREEN)Setting up MinIO bucket...$(RESET)"
+	@echo "$(YELLOW)Waiting for MinIO to be ready...$(RESET)"
+	@sleep 5
+	@docker-compose exec -T app bash -c '\
+		MINIO_ENDPOINT="$${MINIO_ENDPOINT:-http://minio:9000}"; \
+		MINIO_ACCESS_KEY="$${MINIO_ACCESS_KEY:-minioadmin}"; \
+		MINIO_SECRET_KEY="$${MINIO_SECRET_KEY:-minioadmin123}"; \
+		MINIO_BUCKET="$${MINIO_BUCKET:-workforcehub}"; \
+		for i in {1..60}; do \
+			if curl -sf "$$MINIO_ENDPOINT/minio/health/live" > /dev/null 2>&1; then \
+				echo "$(GREEN)✅ MinIO is ready!$(RESET)"; \
+				break; \
+			fi; \
+			if [ $$i -eq 60 ]; then \
+				echo "$(YELLOW)⚠️  MinIO did not become ready in time$(RESET)"; \
+				exit 0; \
+			fi; \
+			sleep 1; \
+		done; \
+		echo "$(GREEN)📦 Creating bucket: $$MINIO_BUCKET$(RESET)"; \
+		response=$$(curl -s -w "\n%{http_code}" -X PUT "$$MINIO_ENDPOINT/$$MINIO_BUCKET" -H "x-amz-content-sha256: UNSIGNED-PAYLOAD" --user "$$MINIO_ACCESS_KEY:$$MINIO_SECRET_KEY" 2>/dev/null || echo "000"); \
+		http_code=$$(echo "$$response" | tail -n1); \
+		if [ "$$http_code" = "200" ] || [ "$$http_code" = "409" ]; then \
+			echo "$(GREEN)✅ Bucket '\''$$MINIO_BUCKET'\'' is ready$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠️  Could not create bucket automatically (HTTP $$http_code)$(RESET)"; \
+			echo "$(YELLOW)   You can create it manually via MinIO Console: http://localhost:9001$(RESET)"; \
+		fi' || echo "$(YELLOW)⚠️  MinIO setup had issues, but continuing...$(RESET)"
+
+install: ## Full installation (dependencies + key + migrate + minio)
 	@echo "$(GREEN)Running full installation...$(RESET)"
 	@echo "$(YELLOW)Waiting for container to be ready...$(RESET)"
 	@sleep 5
@@ -164,6 +199,7 @@ install: ## Full installation (dependencies + key + migrate)
 	@make key || true
 	@sleep 3
 	@make migrate || true
+	@make minio-setup || true
 	@echo "$(GREEN)Installation complete!$(RESET)"
 
 setup: ## Initial setup (build + install)
@@ -173,6 +209,7 @@ setup: ## Initial setup (build + install)
 	@sleep 10
 	@make install
 	@echo "$(GREEN)Setup complete! Access at http://localhost:8000$(RESET)"
+	@echo "$(GREEN)MinIO Console: http://localhost:9001 (minioadmin/minioadmin123)$(RESET)"
 
 mysql: ## Access MySQL shell
 	@echo "$(GREEN)Accessing MySQL shell...$(RESET)"

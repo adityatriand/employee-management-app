@@ -85,11 +85,64 @@ docker-compose exec -T app npm run production || {
 echo "🔐 Setting storage permissions..."
 docker-compose exec -T app chmod -R 775 storage bootstrap/cache
 
+# Setup MinIO
+echo "📦 Setting up MinIO..."
+if docker-compose ps minio 2>/dev/null | grep -q "Up"; then
+    echo "   MinIO container is running, setting up bucket..."
+    # Copy setup script to container and execute
+    docker cp docker/setup-minio.sh app:/tmp/setup-minio.sh 2>/dev/null || {
+        echo "   Creating setup script in container..."
+        docker-compose exec -T app bash -c 'cat > /tmp/setup-minio.sh << "SCRIPTEOF"
+#!/bin/bash
+MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://minio:9000}"
+MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-minioadmin}"
+MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-minioadmin123}"
+MINIO_BUCKET="${MINIO_BUCKET:-workforcehub}"
+
+echo "⏳ Waiting for MinIO to be ready..."
+for i in {1..60}; do
+    if curl -sf "${MINIO_ENDPOINT}/minio/health/live" > /dev/null 2>&1; then
+        echo "✅ MinIO is ready!"
+        break
+    fi
+    if [ $i -eq 60 ]; then
+        echo "⚠️  MinIO did not become ready in time"
+        exit 0
+    fi
+    sleep 1
+done
+
+# Try to create bucket using MinIO API
+echo "📦 Creating bucket: $MINIO_BUCKET"
+response=$(curl -s -w "\n%{http_code}" -X PUT \
+    "${MINIO_ENDPOINT}/${MINIO_BUCKET}" \
+    -H "x-amz-content-sha256: UNSIGNED-PAYLOAD" \
+    --user "${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}" 2>/dev/null || echo "000")
+
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "200" ] || [ "$http_code" = "409" ]; then
+    echo "✅ Bucket '\''$MINIO_BUCKET'\'' is ready"
+else
+    echo "⚠️  Could not create bucket automatically (HTTP $http_code)"
+    echo "   You can create it manually via MinIO Console: http://localhost:9001"
+fi
+SCRIPTEOF
+chmod +x /tmp/setup-minio.sh'
+    }
+    docker-compose exec -T app /tmp/setup-minio.sh || echo "⚠️  MinIO setup had issues, but continuing..."
+else
+    echo "⚠️  MinIO container is not running. Start it with: docker-compose up -d minio"
+    echo "   Then create bucket manually via MinIO Console: http://localhost:9001"
+fi
+
 echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "🌐 Access your application at: http://localhost:8000"
 echo "🗄️  MySQL is available on port 3306"
+echo "📦 MinIO Console: http://localhost:9001"
+echo "   Username: minioadmin"
+echo "   Password: minioadmin123"
 echo ""
 echo "Useful commands:"
 echo "  - View logs: docker-compose logs -f"
