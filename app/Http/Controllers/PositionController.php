@@ -122,7 +122,23 @@ class PositionController extends Controller
 
         return redirect()
             ->route('positions.index')
-            ->with('success', 'Data berhasil dihapus');
+            ->with('success', 'Data berhasil dihapus (dapat dipulihkan)');
+    }
+
+    /**
+     * Restore a soft-deleted position
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore($id)
+    {
+        $position = Position::withTrashed()->findOrFail($id);
+        $position->restore();
+
+        return redirect()
+            ->route('positions.index')
+            ->with('success', 'Data berhasil dipulihkan');
     }
 }
 
