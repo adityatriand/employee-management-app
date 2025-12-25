@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Laravel') }} - Manajemen Pegawai</title>
+    <title>WorkforceHub by Arphidh - Manajemen Pegawai</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo.png') }}">
@@ -17,6 +17,7 @@
     <!-- Scripts -->
     <script src="{{ asset('js/app.js') }}" defer></script>
     <script src="{{ asset('js/searchable-select.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <!-- Fonts -->
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
@@ -33,9 +34,9 @@
     <nav class="sidebar">
         <div class="sidebar-header">
             <a href="{{ route('home') }}" class="sidebar-brand">
-                <img src="{{ asset('images/logo.png') }}" alt="HRMS Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                <img src="{{ asset('images/logo.png') }}" alt="WorkforceHub" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
                 <i class="oi oi-briefcase" style="display: none;"></i>
-                <span>HRMS</span>
+                <span>WorkforceHub</span>
             </a>
         </div>
         <div class="sidebar-nav">
@@ -62,6 +63,15 @@
                 <div class="nav-divider"></div>
             </div>
             <div class="nav-item">
+                <a class="nav-link {{ request()->routeIs('activity-logs.*') ? 'active' : '' }}" href="{{ route('activity-logs.index') }}">
+                    <i class="oi oi-clock"></i>
+                    <span>Riwayat Aktivitas</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <div class="nav-divider"></div>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link" href="{{ route('employees.create') }}">
                     <i class="oi oi-plus"></i>
                     <span>Tambah Pegawai</span>
@@ -81,6 +91,12 @@
                     <span>Logout</span>
                 </a>
             </div>
+        </div>
+        <div class="sidebar-footer">
+            <div class="footer-logo">
+                <img src="{{ asset('images/logo-arphidh.png') }}" alt="Arphidh" class="footer-logo-img" onerror="this.style.display='none';">
+            </div>
+            <p>by Arphidh</p>
         </div>
     </nav>
 
