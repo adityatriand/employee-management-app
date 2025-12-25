@@ -5,6 +5,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\FileController;
 use Illuminate\Support\Facades\Auth;
 
 // Landing page
@@ -23,6 +24,8 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('employees/export/pdf', [EmployeeController::class, 'exportPdf'])->name('employees.export.pdf');
     Route::get('employees/export/excel', [EmployeeController::class, 'exportExcel'])->name('employees.export.excel');
     Route::get('positions', [PositionController::class, 'index'])->name('positions.index');
+    Route::get('files', [FileController::class, 'index'])->name('files.index');
+    Route::get('files/{file}/download', [FileController::class, 'download'])->name('files.download');
 
     // Admin only routes (create, edit, delete) - MUST be before parameterized routes
     Route::middleware('checkLevel')->group(function () {
@@ -39,18 +42,27 @@ Route::group(['middleware' => 'auth'], function () {
         Route::get('positions/{position}/edit', [PositionController::class, 'edit'])->name('positions.edit');
         Route::put('positions/{position}', [PositionController::class, 'update'])->name('positions.update');
         Route::delete('positions/{position}', [PositionController::class, 'destroy'])->name('positions.destroy');
-        
+
         // Restore routes
         Route::post('employees/{employee}/restore', [EmployeeController::class, 'restore'])->name('employees.restore');
         Route::post('positions/{position}/restore', [PositionController::class, 'restore'])->name('positions.restore');
-        
+
         // Activity logs (admin only)
         Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
         Route::get('activity-logs/{activityLog}', [ActivityLogController::class, 'show'])->name('activity-logs.show');
+
+        // File management (admin only) - specific routes first
+        Route::get('files/create', [FileController::class, 'create'])->name('files.create');
+        Route::post('files', [FileController::class, 'store'])->name('files.store');
+        Route::get('files/{file}/edit', [FileController::class, 'edit'])->name('files.edit');
+        Route::put('files/{file}', [FileController::class, 'update'])->name('files.update');
+        Route::delete('files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
+        Route::post('files/{file}/restore', [FileController::class, 'restore'])->name('files.restore');
     });
 
     // Parameterized routes (show) - must be after specific routes
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
     Route::get('positions/{position}', [PositionController::class, 'show'])->name('positions.show');
+    Route::get('files/{file}', [FileController::class, 'show'])->name('files.show');
 });
 

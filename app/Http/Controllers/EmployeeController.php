@@ -104,7 +104,7 @@ class EmployeeController extends Controller
             'name' => 'required|string|max:255',
             'gender' => 'required|in:L,P',
             'birth_date' => 'required|date',
-            'position_id' => 'required|exists:jabatan,id',
+            'position_id' => 'required|exists:positions,id',
             'description' => 'required|string',
             'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
         ], [
@@ -119,12 +119,37 @@ class EmployeeController extends Controller
             'photo.max' => 'Ukuran foto maksimal 2MB',
         ]);
 
-        // Handle file upload
+        // Handle file upload to MinIO
         if ($request->hasFile('photo')) {
             $file = $request->file('photo');
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('images'), $fileName);
-            $validated['photo'] = $fileName;
+            $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = 'photos/' . $fileName;
+            
+            // Upload to MinIO
+            \Illuminate\Support\Facades\Storage::disk('minio')->put($path, file_get_contents($file->getRealPath()));
+            
+            // Create file record
+            $fileRecord = \App\Models\File::create([
+                'name' => $file->getClientOriginalName(),
+                'file_name' => $fileName,
+                'file_path' => $path,
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'file_type' => 'photo',
+                'employee_id' => null, // Will be set after employee is created
+                'uploaded_by' => auth()->id(),
+            ]);
+            
+            // Store file ID in employee record (for backward compatibility)
+            $validated['photo'] = $fileRecord->id;
+            
+            // After creating employee, link the file
+            $employee = Employee::create($validated);
+            $fileRecord->update(['employee_id' => $employee->id]);
+            
+            return redirect()
+                ->route('employees.index')
+                ->with('success', 'Data berhasil ditambahkan');
         }
 
         Employee::create($validated);
@@ -142,8 +167,9 @@ class EmployeeController extends Controller
      */
     public function show($id)
     {
-        $employee = Employee::with('position')->findOrFail($id);
-        return view('employees.show', compact('employee'));
+        $employee = Employee::with(['position', 'files'])->findOrFail($id);
+        $files = $employee->files()->orderBy('created_at', 'desc')->get();
+        return view('employees.show', compact('employee', 'files'));
     }
 
     /**
@@ -175,7 +201,7 @@ class EmployeeController extends Controller
             'name' => 'required|string|max:255',
             'gender' => 'required|in:L,P',
             'birth_date' => 'required|date',
-            'position_id' => 'required|exists:jabatan,id',
+            'position_id' => 'required|exists:positions,id',
             'description' => 'required|string',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ], [
@@ -191,15 +217,33 @@ class EmployeeController extends Controller
 
         // Handle file upload if new photo is provided
         if ($request->hasFile('photo')) {
-            // Delete old photo
-            if ($employee->photo && file_exists(public_path('images/' . $employee->photo))) {
-                unlink(public_path('images/' . $employee->photo));
+            // Delete old photo file if exists
+            $oldPhoto = $employee->photoFile;
+            if ($oldPhoto) {
+                $oldPhoto->delete(); // Soft delete old photo
             }
 
             $file = $request->file('photo');
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('images'), $fileName);
-            $validated['photo'] = $fileName;
+            $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = 'photos/' . $fileName;
+            
+            // Upload to MinIO
+            \Illuminate\Support\Facades\Storage::disk('minio')->put($path, file_get_contents($file->getRealPath()));
+            
+            // Create file record
+            $fileRecord = \App\Models\File::create([
+                'name' => $file->getClientOriginalName(),
+                'file_name' => $fileName,
+                'file_path' => $path,
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'file_type' => 'photo',
+                'employee_id' => $employee->id,
+                'uploaded_by' => auth()->id(),
+            ]);
+            
+            // Store file ID in employee record (for backward compatibility)
+            $validated['photo'] = $fileRecord->id;
         }
 
         $employee->update($validated);

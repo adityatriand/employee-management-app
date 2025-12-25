@@ -39,7 +39,7 @@ class PositionController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:jabatan,name',
+            'name' => 'required|string|max:255|unique:positions,name',
         ], [
             'name.required' => 'Nama jabatan tidak boleh kosong',
             'name.unique' => 'Nama jabatan sudah ada',
@@ -88,7 +88,7 @@ class PositionController extends Controller
         $position = Position::findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:jabatan,name,' . $id . ',id',
+            'name' => 'required|string|max:255|unique:positions,name,' . $id . ',id',
         ], [
             'name.required' => 'Nama jabatan tidak boleh kosong',
             'name.unique' => 'Nama jabatan sudah ada',
