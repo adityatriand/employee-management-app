@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\File;
+use App\Models\Asset;
 use App\Observers\EmployeeObserver;
 use App\Observers\PositionObserver;
 use App\Observers\FileObserver;
+use App\Observers\AssetObserver;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,5 +37,6 @@ class AppServiceProvider extends ServiceProvider
         Employee::observe(EmployeeObserver::class);
         Position::observe(PositionObserver::class);
         File::observe(FileObserver::class);
+        Asset::observe(AssetObserver::class);
     }
 }

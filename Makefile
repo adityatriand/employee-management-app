@@ -1,4 +1,4 @@
-.PHONY: help up down build rebuild restart logs shell composer npm artisan migrate fresh seed install clean crop-logo
+.PHONY: help up down build rebuild restart logs shell composer npm artisan migrate fresh seed install clean crop-logo npm-watch npm-watch-poll npm-watch-bg
 
 # Default target
 .DEFAULT_GOAL := help
@@ -107,6 +107,24 @@ npm-build: ## Build frontend assets (production)
 npm-dev: ## Build frontend assets (development)
 	@echo "$(GREEN)Building frontend assets (dev)...$(RESET)"
 	docker-compose exec -T app npm run dev
+
+npm-watch: ## Watch and auto-compile CSS/JS on changes (runs in foreground)
+	@echo "$(GREEN)Starting watch mode (auto-compile on changes)...$(RESET)"
+	@echo "$(YELLOW)Press Ctrl+C to stop$(RESET)"
+	@docker-compose exec app npm run watch
+
+npm-watch-poll: ## Watch with polling (better for Docker volumes)
+	@echo "$(GREEN)Starting watch mode with polling...$(RESET)"
+	@echo "$(YELLOW)Press Ctrl+C to stop$(RESET)"
+	@docker-compose exec app npm run watch-poll
+
+npm-watch-bg: ## Watch in background (detached)
+	@echo "$(GREEN)Starting watch mode in background...$(RESET)"
+	@docker-compose exec -d app npm run watch-poll || \
+		(docker-compose exec -d app sh -c "npm run watch-poll &")
+	@echo "$(GREEN)Watch mode started in background$(RESET)"
+	@echo "$(YELLOW)Check logs with: make logs$(RESET)"
+
 
 artisan: ## Run artisan command (usage: make artisan CMD="migrate")
 	@if [ -z "$(CMD)" ]; then \

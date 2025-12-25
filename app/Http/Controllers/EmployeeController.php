@@ -167,9 +167,10 @@ class EmployeeController extends Controller
      */
     public function show($id)
     {
-        $employee = Employee::with(['position', 'files'])->findOrFail($id);
+        $employee = Employee::with(['position', 'files', 'assets'])->findOrFail($id);
         $files = $employee->files()->orderBy('created_at', 'desc')->get();
-        return view('employees.show', compact('employee', 'files'));
+        $assets = $employee->assets()->orderBy('assigned_date', 'desc')->get();
+        return view('employees.show', compact('employee', 'files', 'assets'));
     }
 
     /**
