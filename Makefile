@@ -1,4 +1,4 @@
-.PHONY: help up down build rebuild restart logs shell composer npm artisan migrate fresh seed install clean
+.PHONY: help up down build rebuild restart logs shell composer npm artisan migrate fresh seed install clean crop-logo
 
 # Default target
 .DEFAULT_GOAL := help
@@ -68,86 +68,92 @@ composer: ## Install Composer dependencies
 	@echo "$(GREEN)Installing Composer dependencies...$(RESET)"
 	@echo "$(YELLOW)Waiting for container to be ready...$(RESET)"
 	@sleep 3
-	docker-compose exec app composer install --no-interaction || \
+	docker-compose exec -T app composer install --no-interaction || \
 		(echo "$(YELLOW)Install failed, trying update...$(RESET)" && \
-		 docker-compose exec app composer update --no-interaction)
+		 docker-compose exec -T app composer update --no-interaction)
 
 composer-update: ## Update Composer dependencies and lock file
 	@echo "$(GREEN)Updating Composer dependencies and lock file...$(RESET)"
 	@echo "$(YELLOW)Waiting for container to be ready...$(RESET)"
 	@sleep 3
-	docker-compose exec app composer update --no-interaction
+	docker-compose exec -T app composer update --no-interaction
 
 composer-fix-lock: ## Fix composer.lock to match composer.json
 	@echo "$(GREEN)Fixing composer.lock file...$(RESET)"
 	@echo "$(YELLOW)This will update composer.lock to match composer.json$(RESET)"
 	@echo "$(YELLOW)Waiting for container to be ready...$(RESET)"
 	@sleep 3
-	docker-compose exec app composer update --lock --no-interaction
+	docker-compose exec -T app composer update --lock --no-interaction
 	@echo "$(GREEN)composer.lock updated!$(RESET)"
 
 npm: ## Install Node dependencies
 	@echo "$(GREEN)Installing Node dependencies...$(RESET)"
-	docker-compose exec app npm install
+	@echo "$(YELLOW)Waiting for container to be ready...$(RESET)"
+	@sleep 3
+	docker-compose exec -T app npm install || {
+		echo "$(YELLOW)First attempt failed, retrying...$(RESET)"
+		sleep 3
+		docker-compose exec -T app npm install
+	}
 
 npm-build: ## Build frontend assets (production)
 	@echo "$(GREEN)Building frontend assets...$(RESET)"
-	docker-compose exec app npm run production
+	docker-compose exec -T app npm run production
 
 npm-dev: ## Build frontend assets (development)
 	@echo "$(GREEN)Building frontend assets (dev)...$(RESET)"
-	docker-compose exec app npm run dev
+	docker-compose exec -T app npm run dev
 
 artisan: ## Run artisan command (usage: make artisan CMD="migrate")
 	@if [ -z "$(CMD)" ]; then \
 		echo "$(YELLOW)Usage: make artisan CMD=\"your-command\"$(RESET)"; \
 		echo "$(YELLOW)Example: make artisan CMD=\"migrate\"$(RESET)"; \
 	else \
-		docker-compose exec app php artisan $(CMD); \
+		docker-compose exec -T app php artisan $(CMD); \
 	fi
 
 migrate: ## Run database migrations
 	@echo "$(GREEN)Running migrations...$(RESET)"
-	docker-compose exec app php artisan migrate
+	docker-compose exec -T app php artisan migrate
 
 migrate-fresh: ## Fresh migration (drop all tables and re-run)
 	@echo "$(YELLOW)WARNING: This will drop all tables!$(RESET)"
 	@read -p "Continue? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose exec app php artisan migrate:fresh; \
+		docker-compose exec -T app php artisan migrate:fresh; \
 	fi
 
 migrate-rollback: ## Rollback the last migration
 	@echo "$(GREEN)Rolling back last migration...$(RESET)"
-	docker-compose exec app php artisan migrate:rollback
+	docker-compose exec -T app php artisan migrate:rollback
 
 seed: ## Run database seeders
 	@echo "$(GREEN)Running seeders...$(RESET)"
-	docker-compose exec app php artisan db:seed
+	docker-compose exec -T app php artisan db:seed
 
 fresh-seed: ## Fresh migration with seeders
 	@echo "$(YELLOW)WARNING: This will drop all tables and re-run migrations + seeders!$(RESET)"
 	@read -p "Continue? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		docker-compose exec app php artisan migrate:fresh --seed; \
+		docker-compose exec -T app php artisan migrate:fresh --seed; \
 	fi
 
 key: ## Generate application key
 	@echo "$(GREEN)Generating application key...$(RESET)"
-	docker-compose exec app php artisan key:generate
+	docker-compose exec -T app php artisan key:generate
 
 cache-clear: ## Clear all caches
 	@echo "$(GREEN)Clearing caches...$(RESET)"
-	docker-compose exec app php artisan cache:clear
-	docker-compose exec app php artisan config:clear
-	docker-compose exec app php artisan route:clear
-	docker-compose exec app php artisan view:clear
+	docker-compose exec -T app php artisan cache:clear
+	docker-compose exec -T app php artisan config:clear
+	docker-compose exec -T app php artisan route:clear
+	docker-compose exec -T app php artisan view:clear
 
 cache-config: ## Cache configuration
 	@echo "$(GREEN)Caching configuration...$(RESET)"
-	docker-compose exec app php artisan config:cache
+	docker-compose exec -T app php artisan config:cache
 
 install: ## Full installation (dependencies + key + migrate)
 	@echo "$(GREEN)Running full installation...$(RESET)"
