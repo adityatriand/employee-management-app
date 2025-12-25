@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Laravel') }} - {{ $title ?? 'Authentication' }}</title>
+    <title>WorkforceHub by Arphidh - {{ $title ?? 'Authentication' }}</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo.png') }}">
@@ -31,7 +31,7 @@
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-logo">
-                <img src="{{ asset('images/logo.png') }}" alt="HRMS Logo" onerror="this.style.display='none'">
+                <img src="{{ asset('images/logo.png') }}" alt="WorkforceHub" class="auth-main-logo" onerror="this.style.display='none'">
             </div>
             @yield('content')
         </div>

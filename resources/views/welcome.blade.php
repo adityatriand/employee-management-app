@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>HRMS - Sistem Manajemen Pegawai</title>
+    <title>WorkforceHub by Arphidh - Sistem Manajemen Pegawai</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/logo.png') }}">
@@ -25,12 +25,16 @@
 <body>
     <div class="landing-hero">
         <div class="landing-content">
+
             <div class="landing-logo">
-                <img src="{{ asset('images/logo.png') }}" alt="HRMS Logo" class="landing-logo-img" onerror="this.style.display='none'">
+                <img src="{{ asset('images/logo.png') }}" alt="WorkforceHub" class="landing-logo-img" onerror="this.style.display='none'">
+                <h1 class="landing-title">WorkforceHub</h1>
             </div>
-            <h1 class="landing-title">Sistem Manajemen Pegawai</h1>
-            <p class="landing-subtitle">
-                Kelola data pegawai dan jabatan dengan mudah dan efisien
+            <p class="landing-subtitle mb-2">
+                Sistem Terpusat untuk Manajemen Sumber Daya Organisasi
+            </p>
+            <p class="landing-description">
+                Solusi terpadu untuk mengelola tenaga kerja, administrasi, dan sumber daya organisasi dengan efisien dan terpusat
             </p>
             <div class="landing-actions">
                 <a href="{{ route('login') }}" class="btn btn-light btn-lg">
@@ -39,6 +43,10 @@
                 <a href="{{ route('register') }}" class="btn btn-outline-light btn-lg">
                     <i class="oi oi-person"></i> Daftar
                 </a>
+            </div>
+            <div class="landing-attribution">
+                <img src="{{ asset('images/logo-arphidh.png') }}" alt="Arphidh" class="landing-attribution-logo" onerror="this.style.display='none';">
+                <p class="landing-description">by Arphidh</p>
             </div>
         </div>
     </div>
@@ -51,8 +59,8 @@
                         <div class="feature-icon">
                             <i class="oi oi-people"></i>
                         </div>
-                        <h4>Kelola Pegawai</h4>
-                        <p class="text-muted">Kelola data pegawai dengan lengkap termasuk foto, informasi pribadi, dan jabatan.</p>
+                        <h4>Manajemen Tenaga Kerja</h4>
+                        <p class="text-muted">Kelola data tenaga kerja secara terpusat dengan informasi lengkap, termasuk profil, jabatan, dan riwayat aktivitas.</p>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -60,17 +68,17 @@
                         <div class="feature-icon">
                             <i class="oi oi-briefcase"></i>
                         </div>
-                        <h4>Manajemen Jabatan</h4>
-                        <p class="text-muted">Atur struktur jabatan dalam organisasi dengan mudah dan terorganisir.</p>
+                        <h4>Administrasi Terpusat</h4>
+                        <p class="text-muted">Sistem administrasi terintegrasi untuk mengelola struktur organisasi, jabatan, dan sumber daya dengan efisien.</p>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <i class="oi oi-shield"></i>
+                            <i class="oi oi-graph"></i>
                         </div>
-                        <h4>Aman & Terpercaya</h4>
-                        <p class="text-muted">Sistem keamanan yang handal untuk melindungi data penting perusahaan.</p>
+                        <h4>Sumber Daya Organisasi</h4>
+                        <p class="text-muted">Pantau dan kelola seluruh sumber daya organisasi melalui dashboard analitik dan laporan terpusat.</p>
                     </div>
                 </div>
             </div>
