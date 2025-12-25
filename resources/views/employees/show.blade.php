@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@php
+    use Illuminate\Support\Str;
+@endphp
+
 @section('content')
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center">
@@ -177,6 +181,73 @@
     </div>
 </div>
 @endif
+
+<!-- Files Section -->
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="oi oi-folder"></i> Dokumen & File
+        </h5>
+        @if(auth()->user()->level == 1)
+        <a href="{{ route('files.create', ['employee_id' => $employee->id]) }}" class="btn btn-sm btn-success">
+            <i class="oi oi-plus"></i> Upload File
+        </a>
+        @endif
+    </div>
+    <div class="card-body">
+        @if($files->count() > 0)
+        <div class="row g-3">
+            @foreach($files as $file)
+            <div class="col-md-4">
+                <div class="file-card">
+                    <div class="file-icon">
+                        <i class="oi {{ $file->icon }}"></i>
+                    </div>
+                    <div class="file-info">
+                        <h6 class="file-name" title="{{ $file->name }}">{{ Str::limit($file->name, 30) }}</h6>
+                        <div class="file-meta">
+                            <small class="text-muted">
+                                <i class="oi oi-file"></i> {{ $file->formatted_size }}
+                            </small>
+                            @if($file->category)
+                            <span class="badge bg-info ms-2">{{ $file->category }}</span>
+                            @endif
+                        </div>
+                        @if($file->description)
+                        <p class="file-description">{{ Str::limit($file->description, 50) }}</p>
+                        @endif
+                        <div class="file-actions mt-2">
+                            <a href="{{ route('files.download', $file->id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="oi oi-data-transfer-download"></i> Download
+                            </a>
+                            @if(auth()->user()->level == 1)
+                            <form action="{{ route('files.destroy', $file->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="oi oi-trash"></i>
+                                </button>
+                            </form>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @else
+        <div class="text-center py-4">
+            <i class="oi oi-folder" style="font-size: 3rem; color: #cbd5e1;"></i>
+            <p class="mt-3 text-muted">Belum ada file yang diupload.</p>
+            @if(auth()->user()->level == 1)
+            <a href="{{ route('files.create', ['employee_id' => $employee->id]) }}" class="btn btn-success mt-2">
+                <i class="oi oi-plus"></i> Upload File Pertama
+            </a>
+            @endif
+        </div>
+        @endif
+    </div>
+</div>
 
 <!-- Activity Log Section -->
 <div class="card mt-4">

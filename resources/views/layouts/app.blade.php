@@ -58,6 +58,12 @@
                     <span>Data Jabatan</span>
                 </a>
             </div>
+            <div class="nav-item">
+                <a class="nav-link {{ request()->routeIs('files.*') ? 'active' : '' }}" href="{{ route('files.index') }}">
+                    <i class="oi oi-folder"></i>
+                    <span>Manajemen File</span>
+                </a>
+            </div>
             @if(auth()->user()->level == 1)
             <div class="nav-item">
                 <div class="nav-divider"></div>
