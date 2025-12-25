@@ -90,11 +90,10 @@ npm: ## Install Node dependencies
 	@echo "$(GREEN)Installing Node dependencies...$(RESET)"
 	@echo "$(YELLOW)Waiting for container to be ready...$(RESET)"
 	@sleep 3
-	docker-compose exec -T app npm install || {
-		echo "$(YELLOW)First attempt failed, retrying...$(RESET)"
-		sleep 3
-		docker-compose exec -T app npm install
-	}
+	@docker-compose exec -T app npm install || \
+		(echo "$(YELLOW)First attempt failed, retrying...$(RESET)" && \
+		 sleep 3 && \
+		 docker-compose exec -T app npm install)
 
 npm-build: ## Build frontend assets (production)
 	@echo "$(GREEN)Building frontend assets...$(RESET)"
