@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Position;
+use App\Exports\EmployeesExport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
@@ -14,14 +17,68 @@ class EmployeeController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $employees = Employee::with('position')
-            ->orderBy('created_at', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(10);
+        $query = Employee::with('position');
 
-        return view('employees.index', compact('employees'));
+        // Search by name
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        // Filter by position
+        if ($request->filled('position_id')) {
+            $query->where('position_id', $request->position_id);
+        }
+
+        // Filter by gender
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->gender);
+        }
+
+        // Filter by birth date range
+        if ($request->filled('birth_date_from')) {
+            $query->whereDate('birth_date', '>=', $request->birth_date_from);
+        }
+        if ($request->filled('birth_date_to')) {
+            $query->whereDate('birth_date', '<=', $request->birth_date_to);
+        }
+
+        // Filter by creation date range
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_at', '>=', $request->created_from);
+        }
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_at', '<=', $request->created_to);
+        }
+
+        // Order and paginate
+        $employees = $query->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->paginate(10)
+            ->appends($request->query());
+
+        // Get positions for filter dropdown
+        $positions = Position::orderBy('name', 'asc')->get();
+        
+        // Calculate filter status
+        $hasFilters = $request->filled('search') ||
+                     $request->filled('position_id') ||
+                     $request->filled('gender') ||
+                     $request->filled('birth_date_from') ||
+                     $request->filled('birth_date_to') ||
+                     $request->filled('created_from') ||
+                     $request->filled('created_to');
+        
+        $filterCount = 0;
+        if ($request->filled('search')) $filterCount++;
+        if ($request->filled('position_id')) $filterCount++;
+        if ($request->filled('gender')) $filterCount++;
+        if ($request->filled('birth_date_from') || $request->filled('birth_date_to')) $filterCount++;
+        if ($request->filled('created_from') || $request->filled('created_to')) $filterCount++;
+        
+        return view('employees.index', compact('employees', 'positions', 'hasFilters', 'filterCount'));
     }
 
     /**
@@ -161,17 +218,133 @@ class EmployeeController extends Controller
     public function destroy($id)
     {
         $employee = Employee::findOrFail($id);
-
-        // Delete photo file
-        if ($employee->photo && file_exists(public_path('images/' . $employee->photo))) {
-            unlink(public_path('images/' . $employee->photo));
-        }
-
+        
+        // Soft delete (photo file is kept for potential restore)
         $employee->delete();
 
         return redirect()
             ->route('employees.index')
-            ->with('success', 'Data berhasil dihapus');
+            ->with('success', 'Data berhasil dihapus (dapat dipulihkan)');
+    }
+
+    /**
+     * Get filtered employees query (without pagination) for export
+     *
+     * @param Request $request
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    protected function getFilteredEmployeesQuery(Request $request)
+    {
+        $query = Employee::with('position');
+
+        // Search by name
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        // Filter by position
+        if ($request->filled('position_id')) {
+            $query->where('position_id', $request->position_id);
+        }
+
+        // Filter by gender
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->gender);
+        }
+
+        // Filter by birth date range
+        if ($request->filled('birth_date_from')) {
+            $query->whereDate('birth_date', '>=', $request->birth_date_from);
+        }
+        if ($request->filled('birth_date_to')) {
+            $query->whereDate('birth_date', '<=', $request->birth_date_to);
+        }
+
+        // Filter by creation date range
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_at', '>=', $request->created_from);
+        }
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_at', '<=', $request->created_to);
+        }
+
+        // Order
+        $query->orderBy('created_at', 'desc')
+              ->orderBy('id', 'desc');
+
+        return $query;
+    }
+
+    /**
+     * Export employees to PDF
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function exportPdf(Request $request)
+    {
+        $employees = $this->getFilteredEmployeesQuery($request)->get();
+        
+        // Get filter information for PDF header
+        $filters = [];
+        if ($request->filled('search')) {
+            $filters['search'] = $request->search;
+        }
+        if ($request->filled('position_id')) {
+            $position = Position::find($request->position_id);
+            $filters['position'] = $position ? $position->name : '-';
+        }
+        if ($request->filled('gender')) {
+            $filters['gender'] = $request->gender == 'L' ? 'Laki-Laki' : 'Perempuan';
+        }
+        if ($request->filled('birth_date_from') || $request->filled('birth_date_to')) {
+            $filters['birth_date'] = ($request->birth_date_from ?? '-') . ' s/d ' . ($request->birth_date_to ?? '-');
+        }
+        if ($request->filled('created_from') || $request->filled('created_to')) {
+            $filters['created_date'] = ($request->created_from ?? '-') . ' s/d ' . ($request->created_to ?? '-');
+        }
+
+        $pdf = Pdf::loadView('employees.export-pdf', [
+            'employees' => $employees,
+            'filters' => $filters,
+            'total' => $employees->count(),
+        ]);
+
+        $filename = 'data-pegawai-' . date('Y-m-d-His') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Export employees to Excel
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function exportExcel(Request $request)
+    {
+        $employees = $this->getFilteredEmployeesQuery($request)->get();
+        
+        $filename = 'data-pegawai-' . date('Y-m-d-His') . '.xlsx';
+        
+        return Excel::download(new EmployeesExport($employees), $filename);
+    }
+
+    /**
+     * Restore a soft-deleted employee
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore($id)
+    {
+        $employee = Employee::withTrashed()->findOrFail($id);
+        $employee->restore();
+
+        return redirect()
+            ->route('employees.index')
+            ->with('success', 'Data berhasil dipulihkan');
     }
 }
 
