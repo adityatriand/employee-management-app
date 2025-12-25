@@ -14,14 +14,14 @@ return new class extends Migration
     public function up()
     {
         Schema::create('pegawai',function(Blueprint $table){
-            $table->increments('id_pegawai');
-            $table->string('nama_pegawai', 30);
-            $table->date('tgl_lahir');
-            $table->string('foto',50);
-            $table->text('keterangan');
-            $table->integer('id_jabatan');
+            $table->increments('id');
+            $table->string('name', 255);
+            $table->string('gender', 1);
+            $table->date('birth_date');
+            $table->string('photo', 50);
+            $table->text('description');
+            $table->unsignedInteger('position_id');
             $table->timestamps();
-
         });
     }
 

@@ -13,9 +13,13 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::table('jabatan', function(Blueprint $table){
-            $table->string('keterangan');
-        });
+        // This migration is no longer needed as description is now in the original migration
+        // Keeping it for backward compatibility but making it safe
+        if (!Schema::hasColumn('jabatan', 'description')) {
+            Schema::table('jabatan', function(Blueprint $table){
+                $table->text('description')->nullable();
+            });
+        }
     }
 
     /**
