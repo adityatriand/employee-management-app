@@ -10,24 +10,38 @@ class PositionController extends Controller
     /**
      * Display a listing of the resource.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $positions = Position::withCount('employees')
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $positions = Position::where('workspace_id', $workspace->id)
+            ->withCount(['employees' => function($q) use ($workspace) {
+                $q->where('workspace_id', $workspace->id);
+            }])
             ->orderBy('name', 'asc')
             ->paginate(10);
-        return view('positions.index', compact('positions'));
+        return view('positions.index', compact('workspace', 'positions'));
     }
 
     /**
      * Show the form for creating a new resource.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(Request $request)
     {
-        return view('positions.create');
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+        return view('positions.create', compact('workspace'));
     }
 
     /**
@@ -38,106 +52,236 @@ class PositionController extends Controller
      */
     public function store(Request $request)
     {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:positions,name',
+            'name' => 'required|string|max:255',
         ], [
             'name.required' => 'Nama jabatan tidak boleh kosong',
-            'name.unique' => 'Nama jabatan sudah ada',
         ]);
 
+        // Check uniqueness within workspace
+        $exists = Position::where('workspace_id', $workspace->id)
+            ->where('name', $validated['name'])
+            ->exists();
+        
+        if ($exists) {
+            return back()->withErrors(['name' => 'Nama jabatan sudah ada di workspace ini'])->withInput();
+        }
+
+        $validated['workspace_id'] = $workspace->id;
         Position::create($validated);
 
         return redirect()
-            ->route('positions.index')
+            ->route('workspace.positions.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil ditambahkan');
     }
 
     /**
      * Display the specified resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $position Position ID or Position model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request, $position)
     {
-        $position = Position::with('employees')->findOrFail($id);
-        return view('positions.show', compact('position'));
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get position from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $positionParam = $routeParams['position'] ?? $position;
+        
+        // If it's already a Position model instance, use it; otherwise find by ID
+        if ($positionParam instanceof Position) {
+            $position = $positionParam;
+            // Verify workspace access
+            if ($position->workspace_id !== $workspace->id) {
+                abort(404, 'Position not found');
+            }
+        } else {
+            $position = Position::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$positionParam);
+        }
+        
+        $position->load(['employees' => function($q) use ($workspace) {
+            $q->where('workspace_id', $workspace->id);
+        }]);
+        return view('positions.show', compact('workspace', 'position'));
     }
 
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $position Position ID or Position model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Request $request, $position)
     {
-        $position = Position::findOrFail($id);
-        return view('positions.edit', compact('position'));
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get position from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $positionParam = $routeParams['position'] ?? $position;
+        
+        // If it's already a Position model instance, use it; otherwise find by ID
+        if ($positionParam instanceof Position) {
+            $position = $positionParam;
+            // Verify workspace access
+            if ($position->workspace_id !== $workspace->id) {
+                abort(404, 'Position not found');
+            }
+        } else {
+            $position = Position::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$positionParam);
+        }
+        return view('positions.edit', compact('workspace', 'position'));
     }
 
     /**
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
+     * @param  mixed $position Position ID or Position model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $position)
     {
-        $position = Position::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get position from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $positionParam = $routeParams['position'] ?? $position;
+        
+        // If it's already a Position model instance, use it; otherwise find by ID
+        if ($positionParam instanceof Position) {
+            $position = $positionParam;
+            // Verify workspace access
+            if ($position->workspace_id !== $workspace->id) {
+                abort(404, 'Position not found');
+            }
+        } else {
+            $position = Position::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$positionParam);
+        }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:positions,name,' . $id . ',id',
+            'name' => 'required|string|max:255',
         ], [
             'name.required' => 'Nama jabatan tidak boleh kosong',
-            'name.unique' => 'Nama jabatan sudah ada',
         ]);
+
+        // Check uniqueness within workspace
+        $exists = Position::where('workspace_id', $workspace->id)
+            ->where('name', $validated['name'])
+            ->where('id', '!=', $position->id)
+            ->exists();
+        
+        if ($exists) {
+            return back()->withErrors(['name' => 'Nama jabatan sudah ada di workspace ini'])->withInput();
+        }
 
         $position->update($validated);
 
         return redirect()
-            ->route('positions.index')
+            ->route('workspace.positions.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil diedit');
     }
 
     /**
      * Remove the specified resource from storage.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $position Position ID or Position model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $position)
     {
-        $position = Position::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get position from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $positionParam = $routeParams['position'] ?? $position;
+        
+        // If it's already a Position model instance, use it; otherwise find by ID
+        if ($positionParam instanceof Position) {
+            $position = $positionParam;
+            // Verify workspace access
+            if ($position->workspace_id !== $workspace->id) {
+                abort(404, 'Position not found');
+            }
+        } else {
+            $position = Position::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$positionParam);
+        }
 
         // Check if position has employees
-        if ($position->employees()->count() > 0) {
+        if ($position->employees()->where('workspace_id', $workspace->id)->count() > 0) {
             return redirect()
-                ->route('positions.index')
+                ->route('workspace.positions.index', ['workspace' => $workspace->slug])
                 ->with('error', 'Tidak dapat menghapus jabatan yang masih memiliki pegawai');
         }
 
         $position->delete();
 
         return redirect()
-            ->route('positions.index')
+            ->route('workspace.positions.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil dihapus (dapat dipulihkan)');
     }
 
     /**
      * Restore a soft-deleted position
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $position Position ID or Position model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function restore($id)
+    public function restore(Request $request, $position)
     {
-        $position = Position::withTrashed()->findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get position from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $positionParam = $routeParams['position'] ?? $position;
+        
+        // If it's already a Position model instance, use it; otherwise find by ID
+        if ($positionParam instanceof Position) {
+            $position = $positionParam;
+            // Verify workspace access
+            if ($position->workspace_id !== $workspace->id) {
+                abort(404, 'Position not found');
+            }
+            $position = Position::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail($position->id);
+        } else {
+            $position = Position::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail((int)$positionParam);
+        }
         $position->restore();
 
         return redirect()
-            ->route('positions.index')
+            ->route('workspace.positions.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil dipulihkan');
     }
 }

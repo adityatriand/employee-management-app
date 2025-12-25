@@ -5,7 +5,7 @@
     <div class="d-flex justify-content-between align-items-center">
         <h1 class="page-title">Manajemen File</h1>
         @if(auth()->user()->level == 1)
-        <a href="{{ route('files.create') }}" class="btn btn-success">
+        <a href="{{ route('workspace.files.create', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
             <i class="oi oi-plus"></i> Upload File
         </a>
         @endif
@@ -15,8 +15,9 @@
 <!-- Filter Section -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="GET" action="{{ route('files.index') }}" id="filterForm">
+        <form method="GET" action="{{ route('workspace.files.index', ['workspace' => $workspace->slug]) }}" id="filterForm">
             <div class="row g-3">
+                @if(auth()->user()->level == 1)
                 <div class="col-md-3">
                     <label class="form-label fw-bold small">Pegawai</label>
                     <select class="form-select form-select-sm searchable-select" name="employee_id" id="employee_id">
@@ -41,11 +42,17 @@
                     <label class="form-label fw-bold small">Kategori</label>
                     <input type="text" class="form-control form-control-sm" name="category" id="category" value="{{ request('category') }}" placeholder="Kategori...">
                 </div>
+                @else
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">Pencarian</label>
+                    <input type="text" class="form-control form-control-sm" name="search" id="search" value="{{ request('search') }}" placeholder="Pencarian...">
+                </div>
+                @endif
                 <div class="col-md-3 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary btn-sm me-2">
                         <i class="oi oi-filter"></i> Filter
                     </button>
-                    <a href="{{ route('files.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <a href="{{ route('workspace.files.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm">
                         <i class="oi oi-reload"></i> Reset
                     </a>
                 </div>
@@ -95,14 +102,14 @@
                         <p class="file-description mt-2">{{ Str::limit($file->description, 60) }}</p>
                         @endif
                         <div class="file-actions mt-3">
-                            <a href="{{ route('files.download', $file->id) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ route('workspace.files.download', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="oi oi-data-transfer-download"></i> Download
                             </a>
-                            <a href="{{ route('files.show', $file->id) }}" class="btn btn-sm btn-outline-info">
+                            <a href="{{ route('workspace.files.show', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" class="btn btn-sm btn-outline-info">
                                 <i class="oi oi-eye"></i> Detail
                             </a>
                             @if(auth()->user()->level == 1)
-                            <form action="{{ route('files.destroy', $file->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
+                            <form action="{{ route('workspace.files.destroy', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -116,7 +123,7 @@
             </div>
             @endforeach
         </div>
-        
+
         <!-- Pagination -->
         <div class="d-flex justify-content-center mt-4">
             {{ $files->links() }}
@@ -126,7 +133,7 @@
             <i class="oi oi-folder" style="font-size: 4rem; color: #cbd5e1;"></i>
             <p class="mt-3 text-muted">Tidak ada file yang ditemukan.</p>
             @if(auth()->user()->level == 1)
-            <a href="{{ route('files.create') }}" class="btn btn-success mt-2">
+            <a href="{{ route('workspace.files.create', ['workspace' => $workspace->slug]) }}" class="btn btn-success mt-2">
                 <i class="oi oi-plus"></i> Upload File Pertama
             </a>
             @endif

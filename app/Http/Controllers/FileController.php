@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use App\Models\Employee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -28,34 +29,72 @@ class FileController extends Controller
      */
     public function index(Request $request)
     {
-        $query = File::with(['employee', 'uploader'])->orderBy('created_at', 'desc');
-
-        // Filter by employee
-        if ($request->filled('employee_id')) {
-            $query->where('employee_id', $request->employee_id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
         }
 
-        // Filter by file type
-        if ($request->filled('file_type')) {
-            $query->where('file_type', $request->file_type);
+        $user = auth()->user();
+        $query = File::where('workspace_id', $workspace->id)
+            ->with(['employee', 'uploader'])
+            ->orderBy('created_at', 'desc');
+
+        // For regular users (level 0), automatically filter to their own files
+        if ($user->level == 0) {
+            $employee = \App\Models\Employee::where('workspace_id', $workspace->id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if ($employee) {
+                $query->where('employee_id', $employee->id);
+            } else {
+                // If no employee record, return empty result
+                $query->whereRaw('1 = 0');
+            }
+        } else {
+            // For admins, allow filtering by employee
+            if ($request->filled('employee_id')) {
+                $query->where('employee_id', $request->employee_id);
+            }
         }
 
-        // Filter by category
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
+        // Only allow additional filters for admins
+        if ($user->level == 1) {
+            // Filter by file type
+            if ($request->filled('file_type')) {
+                $query->where('file_type', $request->file_type);
+            }
 
-        // Filter standalone files (no employee) - check if employee_id is 0
-        if ($request->filled('employee_id') && $request->employee_id == '0') {
-            $query->whereNull('employee_id');
+            // Filter by category
+            if ($request->filled('category')) {
+                $query->where('category', $request->category);
+            }
+
+            // Filter standalone files (no employee) - check if employee_id is 0
+            if ($request->filled('employee_id') && $request->employee_id == '0') {
+                $query->whereNull('employee_id');
+            }
+        } else {
+            // Filter by search
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('file_name', 'like', '%' . $search . '%')
+                        ->orWhere('description', 'like', '%' . $search . '%')
+                        ->orWhere('category', 'like', '%' . $search . '%');
+                });
+            }
         }
 
         $files = $query->paginate(20)->appends($request->query());
 
-        // Get employees for filter
-        $employees = Employee::orderBy('name', 'asc')->get();
+        // Get employees for filter (scoped to workspace) - only for admins
+        $employees = $user->level == 1
+            ? Employee::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get()
+            : collect();
 
-        return view('files.index', compact('files', 'employees'));
+        return view('files.index', compact('workspace', 'files', 'employees'));
     }
 
     /**
@@ -65,10 +104,15 @@ class FileController extends Controller
      */
     public function create(Request $request)
     {
-        $employees = Employee::orderBy('name', 'asc')->get();
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $employees = Employee::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
         $selectedEmployee = $request->get('employee_id');
 
-        return view('files.create', compact('employees', 'selectedEmployee'));
+        return view('files.create', compact('workspace', 'employees', 'selectedEmployee'));
     }
 
     /**
@@ -79,6 +123,11 @@ class FileController extends Controller
      */
     public function store(Request $request)
     {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
         $validated = $request->validate([
             'file' => 'required|file|max:10240', // 10MB max
             'name' => 'nullable|string|max:255',
@@ -95,14 +144,15 @@ class FileController extends Controller
 
         // Generate unique file name
         $fileName = Str::uuid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
-        
+
         // Determine storage path
-        $path = $validated['file_type'] === 'photo' 
-            ? 'photos/' . $fileName 
+        $path = $validated['file_type'] === 'photo'
+            ? 'photos/' . $fileName
             : 'documents/' . $fileName;
 
-        // Upload to MinIO
-        Storage::disk('minio')->put($path, file_get_contents($uploadedFile->getRealPath()));
+        // Upload to MinIO using workspace-specific bucket
+        $workspaceDisk = $workspace->getStorageDisk();
+        $workspaceDisk->put($path, file_get_contents($uploadedFile->getRealPath()));
 
         // Create file record
         $file = File::create([
@@ -116,11 +166,13 @@ class FileController extends Controller
             'description' => $validated['description'] ?? null,
             'employee_id' => $validated['employee_id'] ?? null,
             'uploaded_by' => auth()->id(),
+            'workspace_id' => $workspace->id,
         ]);
 
         // If it's a photo and associated with employee, update employee photo reference
         if ($validated['file_type'] === 'photo' && $validated['employee_id']) {
-            $employee = Employee::find($validated['employee_id']);
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->find($validated['employee_id']);
             if ($employee) {
                 // Delete old photo file if exists
                 $oldPhoto = $employee->photoFile;
@@ -130,9 +182,10 @@ class FileController extends Controller
             }
         }
 
-        $redirectRoute = $validated['employee_id'] 
-            ? route('employees.show', $validated['employee_id'])
-            : route('files.index');
+        $workspaceSlug = $workspace->slug;
+        $redirectRoute = $validated['employee_id']
+            ? route('workspace.employees.show', ['workspace' => $workspaceSlug, 'employee' => $validated['employee_id']])
+            : route('workspace.files.index', ['workspace' => $workspaceSlug]);
 
         return redirect($redirectRoute)
             ->with('success', 'File berhasil diupload');
@@ -141,13 +194,35 @@ class FileController extends Controller
     /**
      * Display the specified file.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $file File ID or File model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request, $file)
     {
-        $file = File::with(['employee', 'uploader'])->findOrFail($id);
-        
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get file from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $fileParam = $routeParams['file'] ?? $file;
+
+        // If it's already a File model instance, use it; otherwise find by ID
+        if ($fileParam instanceof File) {
+            $file = $fileParam;
+            // Verify workspace access
+            if ($file->workspace_id !== $workspace->id) {
+                abort(404, 'File not found');
+            }
+        } else {
+            $file = File::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$fileParam);
+        }
+
+        $file->load(['employee', 'uploader']);
+
         // Get activity logs for this file
         $activityLogs = \App\Models\ActivityLog::where('model_type', get_class($file))
             ->where('model_id', $file->id)
@@ -155,23 +230,43 @@ class FileController extends Controller
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
-        
-        return view('files.show', compact('file', 'activityLogs'));
+
+        return view('files.show', compact('workspace', 'file', 'activityLogs'));
     }
 
     /**
      * Download the specified file.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $file File ID or File model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function download($id)
+    public function download(Request $request, $file)
     {
-        $file = File::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get file from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $fileParam = $routeParams['file'] ?? $file;
+
+        // If it's already a File model instance, use it; otherwise find by ID
+        if ($fileParam instanceof File) {
+            $file = $fileParam;
+            // Verify workspace access
+            if ($file->workspace_id !== $workspace->id) {
+                abort(404, 'File not found');
+            }
+        } else {
+            $file = File::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$fileParam);
+        }
 
         try {
             $disk = Storage::disk('minio');
-            
+
             if (!$disk->exists($file->file_path)) {
                 return redirect()->back()
                     ->with('error', 'File tidak ditemukan');
@@ -193,7 +288,7 @@ class FileController extends Controller
                 'Content-Length' => $fileSize,
             ]);
         } catch (\Exception $e) {
-            \Log::error('File download error: ' . $e->getMessage());
+            Log::error('File download error: ' . $e->getMessage());
             return redirect()->back()
                 ->with('error', 'File tidak ditemukan atau tidak dapat diakses');
         }
@@ -202,20 +297,41 @@ class FileController extends Controller
     /**
      * Remove the specified file.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $file File ID or File model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $file)
     {
-        $file = File::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get file from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $fileParam = $routeParams['file'] ?? $file;
+
+        // If it's already a File model instance, use it; otherwise find by ID
+        if ($fileParam instanceof File) {
+            $file = $fileParam;
+            // Verify workspace access
+            if ($file->workspace_id !== $workspace->id) {
+                abort(404, 'File not found');
+            }
+        } else {
+            $file = File::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$fileParam);
+        }
         $employeeId = $file->employee_id;
-        
+
         // Soft delete
         $file->delete();
 
-        $redirectRoute = $employeeId 
-            ? route('employees.show', $employeeId)
-            : route('files.index');
+        $workspaceSlug = $workspace->slug;
+        $redirectRoute = $employeeId
+            ? route('workspace.employees.show', ['workspace' => $workspaceSlug, 'employee' => $employeeId])
+            : route('workspace.files.index', ['workspace' => $workspaceSlug]);
 
         return redirect($redirectRoute)
             ->with('success', 'File berhasil dihapus (dapat dipulihkan)');
@@ -224,17 +340,42 @@ class FileController extends Controller
     /**
      * Restore a soft-deleted file.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $file File ID or File model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function restore($id)
+    public function restore(Request $request, $file)
     {
-        $file = File::withTrashed()->findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get file from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $fileParam = $routeParams['file'] ?? $file;
+
+        // If it's already a File model instance, use it; otherwise find by ID
+        if ($fileParam instanceof File) {
+            $file = $fileParam;
+            // Verify workspace access
+            if ($file->workspace_id !== $workspace->id) {
+                abort(404, 'File not found');
+            }
+            $file = File::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail($file->id);
+        } else {
+            $file = File::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail((int)$fileParam);
+        }
         $file->restore();
 
-        $redirectRoute = $file->employee_id 
-            ? route('employees.show', $file->employee_id)
-            : route('files.index');
+        $workspaceSlug = $workspace->slug;
+        $redirectRoute = $file->employee_id
+            ? route('workspace.employees.show', ['workspace' => $workspaceSlug, 'employee' => $file->employee_id])
+            : route('workspace.files.index', ['workspace' => $workspaceSlug]);
 
         return redirect($redirectRoute)
             ->with('success', 'File berhasil dipulihkan');

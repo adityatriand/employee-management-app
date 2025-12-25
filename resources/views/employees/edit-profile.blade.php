@@ -2,12 +2,12 @@
 
 @section('content')
 <div class="page-header">
-    <h1 class="page-title">Tambah Pegawai</h1>
+    <h1 class="page-title">Edit Profil Saya</h1>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h5 class="mb-0">Form Tambah Pegawai</h5>
+        <h5 class="mb-0">Form Edit Profil</h5>
     </div>
     <div class="card-body">
         @if ($errors->any())
@@ -20,23 +20,32 @@
         </div>
         @endif
 
-        <form action="{{ route('workspace.employees.store', ['workspace' => $workspace->slug]) }}" method="POST" enctype="multipart/form-data" id="employeeForm">
+        <form action="{{ route('workspace.profile.update', ['workspace' => $workspace->slug]) }}" method="POST" enctype="multipart/form-data" id="profileForm">
             @csrf
+            @method('PUT')
+            
             <div class="row">
                 <div class="col-md-6">
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Foto <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold">Foto</label>
                         <div class="file-upload-box @error('photo') is-invalid @enderror" id="fileUploadBox">
-                            <input type="file"
-                                   class="file-input"
-                                   id="photo"
-                                   name="photo"
-                                   accept="image/*"
-                                   required>
-                            <div class="file-upload-content">
+                            <input type="file" 
+                                   class="file-input" 
+                                   id="photo" 
+                                   name="photo" 
+                                   accept="image/*">
+                            <div class="file-upload-content" id="uploadContent">
+                                @if($employee->photo)
+                                <div class="current-photo mb-3">
+                                    <p class="text-muted small mb-2">Foto saat ini:</p>
+                                    <img src="{{ $employee->photo_url }}" 
+                                         alt="{{ $employee->name }}" 
+                                         class="current-photo-img">
+                                </div>
+                                @endif
                                 <i class="oi oi-cloud-upload"></i>
-                                <p class="file-upload-text">Klik atau seret foto ke sini</p>
-                                <p class="file-upload-hint">Format: JPG, PNG, GIF. Maksimal 2MB</p>
+                                <p class="file-upload-text">Klik atau seret foto baru ke sini</p>
+                                <p class="file-upload-hint">Kosongkan jika tidak ingin mengubah. Format: JPG, PNG, GIF. Maksimal 2MB</p>
                             </div>
                             <div class="file-preview" id="filePreview" style="display: none;">
                                 <img id="previewImage" src="" alt="Preview">
@@ -53,13 +62,13 @@
                 </div>
                 <div class="col-md-6">
                     <div class="mb-4">
-                        <label for="name" class="form-label fw-bold">Nama Pegawai <span class="text-danger">*</span></label>
-                        <input type="text"
-                               class="form-control @error('name') is-invalid @enderror"
-                               id="name"
-                               name="name"
-                               value="{{ old('name') }}"
-                               placeholder="Masukkan nama pegawai"
+                        <label for="name" class="form-label fw-bold">Nama <span class="text-danger">*</span></label>
+                        <input type="text" 
+                               class="form-control @error('name') is-invalid @enderror" 
+                               id="name" 
+                               name="name" 
+                               value="{{ old('name', $employee->name) }}"
+                               placeholder="Masukkan nama"
                                required>
                         @error('name')
                         <div class="invalid-feedback">{{ $message }}</div>
@@ -74,13 +83,13 @@
                         <label class="form-label fw-bold">Jenis Kelamin <span class="text-danger">*</span></label>
                         <div class="d-flex gap-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="gender" id="jk_l" value="L"
-                                       {{ old('gender') == 'L' ? 'checked' : '' }} required>
+                                <input class="form-check-input" type="radio" name="gender" id="jk_l" value="L" 
+                                       {{ old('gender', $employee->gender) == 'L' ? 'checked' : '' }} required>
                                 <label class="form-check-label" for="jk_l">Laki-Laki</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="gender" id="jk_p" value="P"
-                                       {{ old('gender') == 'P' ? 'checked' : '' }} required>
+                                <input class="form-check-input" type="radio" name="gender" id="jk_p" value="P" 
+                                       {{ old('gender', $employee->gender) == 'P' ? 'checked' : '' }} required>
                                 <label class="form-check-label" for="jk_p">Perempuan</label>
                             </div>
                         </div>
@@ -92,11 +101,11 @@
                 <div class="col-md-6">
                     <div class="mb-4">
                         <label for="birth_date" class="form-label fw-bold">Tanggal Lahir <span class="text-danger">*</span></label>
-                        <input type="date"
-                               class="form-control @error('birth_date') is-invalid @enderror"
-                               id="birth_date"
-                               name="birth_date"
-                               value="{{ old('birth_date') }}"
+                        <input type="date" 
+                               class="form-control @error('birth_date') is-invalid @enderror" 
+                               id="birth_date" 
+                               name="birth_date" 
+                               value="{{ old('birth_date', $employee->birth_date ? $employee->birth_date->format('Y-m-d') : '') }}"
                                required>
                         @error('birth_date')
                         <div class="invalid-feedback">{{ $message }}</div>
@@ -105,62 +114,11 @@
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-4">
-                        <label for="email" class="form-label fw-bold">Email (Opsional)</label>
-                        <input type="email"
-                               class="form-control @error('email') is-invalid @enderror"
-                               id="email"
-                               name="email"
-                               value="{{ old('email') }}"
-                               placeholder="email@example.com">
-                        <small class="text-muted">Jika diisi, akan dibuat akun pengguna untuk pegawai ini (password default: password123)</small>
-                        @error('email')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="mb-4">
-                        <label for="position_id" class="form-label fw-bold">Jabatan <span class="text-danger">*</span></label>
-                        <select class="form-select searchable-select @error('position_id') is-invalid @enderror"
-                                id="position_id"
-                                name="position_id"
-                                required>
-                            <option value="" {{ old('position_id') == '' || old('position_id') === null ? 'selected' : '' }}>-- Pilih Jabatan --</option>
-                            @foreach($positions as $position)
-                            <option value="{{ $position->id }}"
-                                    {{ old('position_id') == $position->id ? 'selected' : '' }}>
-                                {{ $position->name }}
-                            </option>
-                            @endforeach
-                        </select>
-                        @error('position_id')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <label for="description" class="form-label fw-bold">Keterangan <span class="text-danger">*</span></label>
-                <textarea class="form-control @error('description') is-invalid @enderror"
-                          id="description"
-                          name="description"
-                          rows="4"
-                          placeholder="Masukkan keterangan"
-                          required>{{ old('description') }}</textarea>
-                @error('description')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">
-                    <i class="oi oi-check"></i> Simpan
+                    <i class="oi oi-check"></i> Update Profil
                 </button>
-                <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-secondary">
+                <a href="{{ route('workspace.dashboard', ['workspace' => $workspace->slug]) }}" class="btn btn-secondary">
                     <i class="oi oi-x"></i> Batal
                 </a>
             </div>
@@ -173,7 +131,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('photo');
     const fileUploadBox = document.getElementById('fileUploadBox');
-    const uploadContent = document.querySelector('.file-upload-content');
+    const uploadContent = document.getElementById('uploadContent');
     const filePreview = document.getElementById('filePreview');
     const previewImage = document.getElementById('previewImage');
     const fileName = document.getElementById('fileName');
@@ -193,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fileUploadBox.addEventListener('drop', function(e) {
         e.preventDefault();
         fileUploadBox.classList.remove('dragover');
-
+        
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             fileInput.files = files;

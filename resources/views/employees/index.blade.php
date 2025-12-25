@@ -12,19 +12,19 @@
                 </button>
                 <ul class="dropdown-menu">
                     <li>
-                        <a class="dropdown-item" href="{{ route('employees.export.pdf', request()->query()) }}">
+                        <a class="dropdown-item" href="{{ route('workspace.employees.export.pdf', array_merge(['workspace' => $workspace->slug], request()->query())) }}">
                             <i class="oi oi-file"></i> Export ke PDF
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" href="{{ route('employees.export.excel', request()->query()) }}">
+                        <a class="dropdown-item" href="{{ route('workspace.employees.export.excel', array_merge(['workspace' => $workspace->slug], request()->query())) }}">
                             <i class="oi oi-spreadsheet"></i> Export ke Excel
                         </a>
                     </li>
                 </ul>
             </div>
             @if(auth()->user()->level == 1)
-            <a href="{{ route('employees.create') }}" class="btn btn-success">
+            <a href="{{ route('workspace.employees.create', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
                 <i class="oi oi-plus"></i> Tambah Pegawai
             </a>
             @endif
@@ -35,7 +35,7 @@
 <!-- Search and Filter Section -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="GET" action="{{ route('employees.index') }}" id="filterForm">
+        <form method="GET" action="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" id="filterForm">
             <!-- Search Bar -->
             <div class="row mb-3">
                 <div class="col-md-6">
@@ -62,7 +62,7 @@
                         @endif
                     </button>
                     @if($hasFilters)
-                    <a href="{{ route('employees.index') }}" class="btn btn-outline-danger ms-2">
+                    <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-danger ms-2">
                         <i class="oi oi-reload"></i> Reset
                     </a>
                     @endif
@@ -129,7 +129,7 @@
                         <button type="submit" class="btn btn-primary btn-sm me-2">
                             <i class="oi oi-magnifying-glass"></i> Terapkan Filter
                         </button>
-                        <a href="{{ route('employees.index') }}" class="btn btn-outline-secondary btn-sm">
+                        <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm">
                             <i class="oi oi-reload"></i> Reset
                         </a>
                     </div>
@@ -155,7 +155,7 @@
                 @php
                     $query = request()->query();
                     unset($query['search']);
-                    $removeSearchUrl = route('employees.index', $query);
+                    $removeSearchUrl = route('workspace.employees.index', array_merge(['workspace' => $workspace->slug], $query));
                 @endphp
                 <span class="badge bg-primary filter-badge">
                     Pencarian: "{{ request('search') }}"
@@ -168,7 +168,7 @@
                 @php
                     $query = request()->query();
                     unset($query['position_id']);
-                    $removePositionUrl = route('employees.index', $query);
+                    $removePositionUrl = route('workspace.employees.index', array_merge(['workspace' => $workspace->slug], $query));
                     $positionName = $positions->firstWhere('id', request('position_id'))->name ?? '';
                 @endphp
                 <span class="badge bg-primary filter-badge">
@@ -182,7 +182,7 @@
                 @php
                     $query = request()->query();
                     unset($query['gender']);
-                    $removeGenderUrl = route('employees.index', $query);
+                    $removeGenderUrl = route('workspace.employees.index', array_merge(['workspace' => $workspace->slug], $query));
                 @endphp
                 <span class="badge bg-primary filter-badge">
                     Gender: {{ request('gender') == 'L' ? 'Laki-Laki' : 'Perempuan' }}
@@ -196,7 +196,7 @@
                     $query = request()->query();
                     unset($query['birth_date_from']);
                     unset($query['birth_date_to']);
-                    $removeBirthDateUrl = route('employees.index', $query);
+                    $removeBirthDateUrl = route('workspace.employees.index', array_merge(['workspace' => $workspace->slug], $query));
                 @endphp
                 <span class="badge bg-primary filter-badge">
                     Tanggal Lahir: {{ request('birth_date_from') ?? 'Awal' }} - {{ request('birth_date_to') ?? 'Akhir' }}
@@ -210,7 +210,7 @@
                     $query = request()->query();
                     unset($query['created_from']);
                     unset($query['created_to']);
-                    $removeCreatedUrl = route('employees.index', $query);
+                    $removeCreatedUrl = route('workspace.employees.index', array_merge(['workspace' => $workspace->slug], $query));
                 @endphp
                 <span class="badge bg-primary filter-badge">
                     Ditambahkan: {{ request('created_from') ?? 'Awal' }} - {{ request('created_to') ?? 'Akhir' }}
@@ -246,14 +246,14 @@
                     <tr>
                         <td>{{ $employees->firstItem() + $loop->index }}</td>
                         <td>
-                            <a href="{{ route('employees.show', $employee->id) }}" class="d-inline-block">
+                            <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" class="d-inline-block">
                                 <img src="{{ $employee->photo_url }}" 
                                      alt="{{ $employee->name }}" 
                                      class="employee-photo">
                             </a>
                         </td>
                         <td>
-                            <a href="{{ route('employees.show', $employee->id) }}" class="employee-name-link">
+                            <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" class="employee-name-link">
                                 {{ $employee->name }}
                             </a>
                         </td>
@@ -270,19 +270,19 @@
                         </td>
                         <td class="text-center">
                             <div class="action-buttons">
-                                <a href="{{ route('employees.show', $employee->id) }}" 
+                                <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" 
                                    class="btn-action btn-view" 
                                    title="Lihat Detail">
                                     <i class="oi oi-eye"></i>
                                     <span>Lihat</span>
                                 </a>
                                 @if(auth()->user()->level == 1)
-                                <a href="{{ route('employees.edit', $employee->id) }}" 
+                                <a href="{{ route('workspace.employees.edit', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" 
                                    class="btn-action btn-edit" title="Edit">
                                     <i class="oi oi-pencil"></i>
                                     <span>Edit</span>
                                 </a>
-                                <form action="{{ route('employees.destroy', $employee->id) }}" 
+                                <form action="{{ route('workspace.employees.destroy', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" 
                                       method="POST" class="d-inline"
                                       onsubmit="return confirm('Apakah Anda yakin ingin menghapus pegawai ini?');">
                                     @csrf
@@ -317,13 +317,13 @@
             <i class="oi oi-people" style="font-size: 4rem; color: #cbd5e1;"></i>
             @if($hasFilters)
             <p class="mt-3 text-muted">Tidak ada data pegawai yang sesuai dengan filter</p>
-            <a href="{{ route('employees.index') }}" class="btn btn-outline-primary">
+            <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-primary">
                 <i class="oi oi-reload"></i> Reset Filter
             </a>
             @else
             <p class="mt-3 text-muted">Belum ada data pegawai</p>
             @if(auth()->user()->level == 1)
-            <a href="{{ route('employees.create') }}" class="btn btn-success">
+            <a href="{{ route('workspace.employees.create', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
                 <i class="oi oi-plus"></i> Tambah Pegawai Pertama
             </a>
             @endif

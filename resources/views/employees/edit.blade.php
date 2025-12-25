@@ -20,7 +20,7 @@
         </div>
         @endif
 
-        <form action="{{ route('employees.update', $employee->id) }}" method="POST" enctype="multipart/form-data" id="employeeForm">
+        <form action="{{ route('workspace.employees.update', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" method="POST" enctype="multipart/form-data" id="employeeForm">
             @csrf
             @method('PUT')
             
@@ -154,7 +154,7 @@
                 <button type="submit" class="btn btn-primary">
                     <i class="oi oi-check"></i> Update
                 </button>
-                <a href="{{ route('employees.index') }}" class="btn btn-secondary">
+                <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-secondary">
                     <i class="oi oi-x"></i> Batal
                 </a>
             </div>

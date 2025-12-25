@@ -41,13 +41,13 @@
                 Solusi terpadu untuk mengelola tenaga kerja, administrasi, dan sumber daya organisasi dengan efisien dan terpusat
             </p>
             <div class="landing-actions">
-                <a href="{{ route('login') }}" class="btn btn-light btn-lg">
-                    <i class="oi oi-account-login"></i> Masuk
-                </a>
-                <a href="{{ route('register') }}" class="btn btn-outline-light btn-lg">
-                    <i class="oi oi-person"></i> Daftar
+                <a href="{{ route('register') }}" class="btn btn-light btn-lg">
+                    <i class="oi oi-person"></i> Daftar Sekarang
                 </a>
             </div>
+            <p class="landing-description mt-3" style="font-size: 0.9rem; opacity: 0.9;">
+                Sudah punya akun? Hubungi administrator workspace Anda untuk mendapatkan link login.
+            </p>
         </div>
     </div>
 

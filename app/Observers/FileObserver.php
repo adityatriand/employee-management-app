@@ -25,6 +25,7 @@ class FileObserver
 
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $file->workspace_id,
             'model_type' => get_class($file),
             'model_id' => $file->id,
             'action' => 'created',
@@ -52,6 +53,7 @@ class FileObserver
         if (!empty($oldValues)) {
             ActivityLog::create([
                 'user_id' => Auth::id(),
+                'workspace_id' => $file->workspace_id,
                 'model_type' => get_class($file),
                 'model_id' => $file->id,
                 'action' => 'updated',
@@ -72,6 +74,7 @@ class FileObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $file->workspace_id,
             'model_type' => get_class($file),
             'model_id' => $file->id,
             'action' => 'deleted',
@@ -90,6 +93,7 @@ class FileObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $file->workspace_id,
             'model_type' => get_class($file),
             'model_id' => $file->id,
             'action' => 'restored',

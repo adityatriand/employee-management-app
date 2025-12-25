@@ -11,6 +11,7 @@ class ActivityLog extends Model
 
     protected $fillable = [
         'user_id',
+        'workspace_id',
         'model_type',
         'model_id',
         'action',
@@ -32,6 +33,14 @@ class ActivityLog extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the workspace this activity log belongs to
+     */
+    public function workspace()
+    {
+        return $this->belongsTo(Workspace::class);
     }
 
     /**

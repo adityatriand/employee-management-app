@@ -33,6 +33,7 @@ class Asset extends Model
         'assigned_to',
         'assigned_date',
         'assigned_by',
+        'workspace_id',
     ];
 
     protected $casts = [
@@ -46,11 +47,27 @@ class Asset extends Model
     protected $appends = ['image_url', 'status_color', 'status_label'];
 
     /**
+     * Get the workspace that owns the asset
+     */
+    public function workspace()
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    /**
      * Get the employee currently assigned to this asset.
      */
     public function assignedEmployee()
     {
         return $this->belongsTo(Employee::class, 'assigned_to', 'id');
+    }
+
+    /**
+     * Alias for assignedEmployee (for consistency)
+     */
+    public function assignedTo()
+    {
+        return $this->assignedEmployee();
     }
 
     /**
@@ -76,13 +93,16 @@ class Asset extends Model
     {
         if ($this->image) {
             try {
-                $disk = Storage::disk('minio');
-                if ($disk->exists($this->image)) {
-                    // Use Laravel route to stream image instead of direct MinIO URL
-                    return route('storage.assets.image', $this->id);
+                // Get workspace slug for route generation
+                $workspaceSlug = $this->workspace ? $this->workspace->slug : (auth()->check() && auth()->user()->workspace ? auth()->user()->workspace->slug : null);
+                
+                if ($workspaceSlug) {
+                    // Use Laravel route to stream image - the route handler will check if file exists in workspace bucket
+                    return route('workspace.storage.assets.image', ['workspace' => $workspaceSlug, 'asset' => $this->id]);
                 }
+                return '#';
             } catch (\Exception $e) {
-                // MinIO might not be available, fall through to placeholder
+                // Route generation might fail, fall through to placeholder
                 \Log::warning('Asset image URL generation failed: ' . $e->getMessage());
             }
         }

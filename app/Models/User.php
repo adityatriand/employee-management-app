@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'password',
         'level',
+        'workspace_id',
     ];
 
     /**
@@ -42,4 +43,36 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Get the workspace that owns the user.
+     */
+    public function workspace()
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    /**
+     * Check if user is workspace owner.
+     */
+    public function isWorkspaceOwner()
+    {
+        return $this->workspace && $this->workspace->owner_id === $this->id;
+    }
+
+    /**
+     * Check if user is admin (level 1).
+     */
+    public function isAdmin()
+    {
+        return $this->level == 1;
+    }
+
+    /**
+     * Check if user is regular user (level 0).
+     */
+    public function isRegularUser()
+    {
+        return $this->level == 0;
+    }
 }

@@ -85,8 +85,9 @@
         </button>
 
         <div class="text-center mt-3">
-            <span class="text-muted">Sudah punya akun? </span>
-            <a href="{{ route('login') }}" class="text-primary">Masuk</a>
+            <p class="text-muted" style="font-size: 0.9rem;">
+                Sudah punya akun? Hubungi administrator workspace Anda untuk mendapatkan link login.
+            </p>
         </div>
     </div>
 </form>

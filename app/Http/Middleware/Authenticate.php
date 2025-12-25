@@ -15,7 +15,13 @@ class Authenticate extends Middleware
     protected function redirectTo($request)
     {
         if (! $request->expectsJson()) {
-            return route('login');
+            // Check if there's a workspace in the route
+            $workspaceSlug = $request->route('workspace');
+            if ($workspaceSlug) {
+                return route('workspace.login', ['workspace' => $workspaceSlug]);
+            }
+            // Otherwise redirect to landing page
+            return route('welcome');
         }
     }
 }

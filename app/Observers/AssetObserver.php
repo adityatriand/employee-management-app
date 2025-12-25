@@ -23,6 +23,7 @@ class AssetObserver
 
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $asset->workspace_id,
             'model_type' => get_class($asset),
             'model_id' => $asset->id,
             'action' => 'created',
@@ -41,7 +42,7 @@ class AssetObserver
     {
         $oldValues = [];
         $newValues = [];
-        
+
         foreach ($asset->getDirty() as $key => $value) {
             $oldValues[$key] = $asset->getOriginal($key);
             $newValues[$key] = $value;
@@ -49,7 +50,7 @@ class AssetObserver
 
         if (!empty($oldValues)) {
             $description = "Aset '{$asset->name}' telah diupdate";
-            
+
             // Special handling for assignment changes
             if (isset($oldValues['assigned_to']) || isset($newValues['assigned_to'])) {
                 if (empty($oldValues['assigned_to']) && !empty($newValues['assigned_to'])) {
@@ -63,6 +64,7 @@ class AssetObserver
 
             ActivityLog::create([
                 'user_id' => Auth::id(),
+                'workspace_id' => $asset->workspace_id,
                 'model_type' => get_class($asset),
                 'model_id' => $asset->id,
                 'action' => 'updated',
@@ -83,6 +85,7 @@ class AssetObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $asset->workspace_id,
             'model_type' => get_class($asset),
             'model_id' => $asset->id,
             'action' => 'deleted',
@@ -101,6 +104,7 @@ class AssetObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $asset->workspace_id,
             'model_type' => get_class($asset),
             'model_id' => $asset->id,
             'action' => 'restored',

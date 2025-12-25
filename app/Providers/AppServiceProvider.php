@@ -6,10 +6,12 @@ use App\Models\Employee;
 use App\Models\Position;
 use App\Models\File;
 use App\Models\Asset;
+use App\Models\Workspace;
 use App\Observers\EmployeeObserver;
 use App\Observers\PositionObserver;
 use App\Observers\FileObserver;
 use App\Observers\AssetObserver;
+use App\Observers\WorkspaceObserver;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -38,5 +40,6 @@ class AppServiceProvider extends ServiceProvider
         Position::observe(PositionObserver::class);
         File::observe(FileObserver::class);
         Asset::observe(AssetObserver::class);
+        Workspace::observe(WorkspaceObserver::class);
     }
 }

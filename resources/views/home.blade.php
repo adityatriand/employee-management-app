@@ -67,10 +67,10 @@
         <h3>Selamat Datang di Aplikasi Manajemen Pegawai</h3>
         <p class="text-muted">Anda login sebagai Administrator</p>
         <div class="mt-4">
-            <a href="{{ route('employees.index') }}" class="btn btn-primary me-2">
+            <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-primary me-2">
                 <i class="oi oi-people"></i> Kelola Pegawai
             </a>
-            <a href="{{ route('positions.index') }}" class="btn btn-success">
+            <a href="{{ route('workspace.positions.index', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
                 <i class="oi oi-briefcase"></i> Kelola Jabatan
             </a>
         </div>

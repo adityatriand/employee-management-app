@@ -4,7 +4,7 @@
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center">
         <div>
-            <a href="{{ route('activity-logs.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            <a href="{{ route('workspace.activity-logs.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
                 <i class="oi oi-chevron-left"></i> Kembali
             </a>
             <h1 class="page-title mb-0">Detail Aktivitas</h1>
@@ -139,16 +139,16 @@
             </div>
             <div class="card-body">
                 <div class="list-group list-group-flush">
-                    <a href="{{ route('activity-logs.index') }}" class="list-group-item list-group-item-action">
+                    <a href="{{ route('workspace.activity-logs.index', ['workspace' => $workspace->slug]) }}" class="list-group-item list-group-item-action">
                         <i class="oi oi-list"></i> Kembali ke Daftar
                     </a>
                     @if($activityLog->model_type == 'App\Models\Employee')
-                    <a href="{{ route('employees.show', $activityLog->model_id) }}" class="list-group-item list-group-item-action">
+                    <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $activityLog->model_id]) }}" class="list-group-item list-group-item-action">
                         <i class="oi oi-person"></i> Lihat Pegawai
                     </a>
                     @endif
                     @if($activityLog->model_type == 'App\Models\Position')
-                    <a href="{{ route('positions.show', $activityLog->model_id) }}" class="list-group-item list-group-item-action">
+                    <a href="{{ route('workspace.positions.show', ['workspace' => $workspace->slug, 'position' => $activityLog->model_id]) }}" class="list-group-item list-group-item-action">
                         <i class="oi oi-briefcase"></i> Lihat Jabatan
                     </a>
                     @endif

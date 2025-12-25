@@ -11,9 +11,15 @@
             <h1 class="page-title mb-0">Detail Pegawai</h1>
         </div>
         <div>
-            <a href="{{ route('employees.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
-                <i class="oi oi-chevron-left"></i> Kembali
-            </a>
+            @if(auth()->user()->level == 1)
+                <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="oi oi-chevron-left"></i> Kembali
+                </a>
+            @else
+                <a href="{{ route('workspace.dashboard', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="oi oi-chevron-left"></i> Kembali
+                </a>
+            @endif
         </div>
     </div>
 </div>
@@ -61,40 +67,6 @@
 
     <!-- Right Column - Detailed Information -->
     <div class="col-md-8">
-        <!-- Personal Information -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="oi oi-person"></i> Informasi Pribadi
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="info-grid">
-                    <div class="info-item">
-                        <div class="info-label">Nama Lengkap</div>
-                        <div class="info-value">{{ $employee->name }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Jenis Kelamin</div>
-                        <div class="info-value">
-                            @if($employee->gender == 'L')
-                                <span class="badge bg-primary">Laki-Laki</span>
-                            @else
-                                <span class="badge bg-danger">Perempuan</span>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Tanggal Lahir</div>
-                        <div class="info-value">{{ $employee->birth_date->format('d F Y') }}</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Usia</div>
-                        <div class="info-value">{{ $employee->birth_date->age }} tahun</div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Position Information -->
         <div class="card mb-4">
@@ -164,10 +136,10 @@
 <div class="card mt-4">
     <div class="card-body">
         <div class="d-flex gap-2 justify-content-end">
-            <a href="{{ route('employees.edit', $employee->id) }}" class="btn btn-primary">
+            <a href="{{ route('workspace.employees.edit', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" class="btn btn-primary">
                 <i class="oi oi-pencil"></i> Edit Pegawai
             </a>
-            <form action="{{ route('employees.destroy', $employee->id) }}"
+            <form action="{{ route('workspace.employees.destroy', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}"
                   method="POST"
                   class="d-inline"
                   onsubmit="return confirm('Apakah Anda yakin ingin menghapus pegawai ini?');">
@@ -189,7 +161,7 @@
             <i class="oi oi-folder"></i> Dokumen & File
         </h5>
         @if(auth()->user()->level == 1)
-        <a href="{{ route('files.create', ['employee_id' => $employee->id]) }}" class="btn btn-sm btn-success">
+        <a href="{{ route('workspace.files.create', array_merge(['workspace' => $workspace->slug], ['employee_id' => $employee->id])) }}" class="btn btn-sm btn-success">
             <i class="oi oi-plus"></i> Upload File
         </a>
         @endif
@@ -217,11 +189,11 @@
                         <p class="file-description">{{ Str::limit($file->description, 50) }}</p>
                         @endif
                         <div class="file-actions mt-2">
-                            <a href="{{ route('files.download', $file->id) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ route('workspace.files.download', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="oi oi-data-transfer-download"></i> Download
                             </a>
                             @if(auth()->user()->level == 1)
-                            <form action="{{ route('files.destroy', $file->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
+                            <form action="{{ route('workspace.files.destroy', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -240,7 +212,7 @@
             <i class="oi oi-folder" style="font-size: 3rem; color: #cbd5e1;"></i>
             <p class="mt-3 text-muted">Belum ada file yang diupload.</p>
             @if(auth()->user()->level == 1)
-            <a href="{{ route('files.create', ['employee_id' => $employee->id]) }}" class="btn btn-success mt-2">
+            <a href="{{ route('workspace.files.create', array_merge(['workspace' => $workspace->slug], ['employee_id' => $employee->id])) }}" class="btn btn-success mt-2">
                 <i class="oi oi-plus"></i> Upload File Pertama
             </a>
             @endif
@@ -256,7 +228,7 @@
                         <i class="oi oi-box"></i> Aset yang Ditugaskan
                     </h5>
                     @if(auth()->user()->level == 1)
-                    <a href="{{ route('assets.create', ['employee_id' => $employee->id]) }}" class="btn btn-sm btn-success">
+                    <a href="{{ route('workspace.assets.create', array_merge(['workspace' => $workspace->slug], ['employee_id' => $employee->id])) }}" class="btn btn-sm btn-success">
                         <i class="oi oi-plus"></i> Tugaskan Aset
                     </a>
                     @endif
@@ -279,7 +251,7 @@
                                     </div>
                                 </div>
                                 <div class="asset-actions">
-                                    <a href="{{ route('assets.show', $asset->id) }}" class="btn btn-sm btn-outline-primary" title="Detail">
+                                    <a href="{{ route('workspace.assets.show', ['workspace' => $workspace->slug, 'asset' => $asset->id]) }}" class="btn btn-sm btn-outline-primary" title="Detail">
                                         <i class="oi oi-eye"></i>
                                     </a>
                                 </div>
@@ -292,7 +264,7 @@
                         <i class="oi oi-box" style="font-size: 3rem; color: #cbd5e1;"></i>
                         <p class="mt-3 text-muted">Tidak ada aset yang ditugaskan ke pegawai ini.</p>
                         @if(auth()->user()->level == 1)
-                        <a href="{{ route('assets.create', ['employee_id' => $employee->id]) }}" class="btn btn-success">
+                        <a href="{{ route('workspace.assets.create', array_merge(['workspace' => $workspace->slug], ['employee_id' => $employee->id])) }}" class="btn btn-success">
                             <i class="oi oi-plus"></i> Tugaskan Aset Pertama
                         </a>
                         @endif
@@ -308,7 +280,7 @@
             <i class="oi oi-clock"></i> Riwayat Aktivitas
         </h5>
         @if(auth()->user()->level == 1)
-        <a href="{{ route('activity-logs.index', ['model_type' => get_class($employee), 'model_id' => $employee->id]) }}" class="btn btn-sm btn-outline-primary">
+        <a href="{{ route('workspace.activity-logs.index', array_merge(['workspace' => $workspace->slug], ['model_type' => get_class($employee), 'model_id' => $employee->id])) }}" class="btn btn-sm btn-outline-primary">
             Lihat Semua <i class="oi oi-chevron-right"></i>
         </a>
         @endif

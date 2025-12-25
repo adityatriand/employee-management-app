@@ -20,7 +20,7 @@
         </div>
         @endif
 
-        <form action="{{ route('positions.store') }}" method="POST">
+        <form action="{{ route('workspace.positions.store', ['workspace' => $workspace->slug]) }}" method="POST">
             @csrf
             <div class="mb-4">
                 <label for="name" class="form-label fw-bold">Nama Jabatan <span class="text-danger">*</span></label>
@@ -40,7 +40,7 @@
                 <button type="submit" class="btn btn-primary">
                     <i class="oi oi-check"></i> Simpan
                 </button>
-                <a href="{{ route('positions.index') }}" class="btn btn-secondary">
+                <a href="{{ route('workspace.positions.index', ['workspace' => $workspace->slug]) }}" class="btn btn-secondary">
                     <i class="oi oi-x"></i> Batal
                 </a>
             </div>

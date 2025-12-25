@@ -7,7 +7,7 @@
             <h1 class="page-title mb-0">Tambah Aset</h1>
         </div>
         <div>
-            <a href="{{ route('assets.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            <a href="{{ route('workspace.assets.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
                 <i class="oi oi-chevron-left"></i> Kembali
             </a>
         </div>
@@ -15,7 +15,7 @@
 </div>
 
 <div class="row">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Form Tambah Aset</h5>
@@ -31,7 +31,7 @@
                 </div>
                 @endif
 
-                <form action="{{ route('assets.store') }}" method="POST" enctype="multipart/form-data" id="assetForm">
+                <form action="{{ route('workspace.assets.store', ['workspace' => $workspace->slug]) }}" method="POST" enctype="multipart/form-data" id="assetForm">
                     @csrf
 
                     <div class="row">
@@ -317,7 +317,7 @@
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('assets.index') }}" class="btn btn-outline-secondary">Batal</a>
+                        <a href="{{ route('workspace.assets.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary">Batal</a>
                         <button type="submit" class="btn btn-primary">
                             <i class="oi oi-check"></i> Simpan
                         </button>
@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show/hide assigned date based on assigned_to
     const assignedTo = document.getElementById('assigned_to');
     const assignedDateGroup = document.getElementById('assignedDateGroup');
-    
+
     assignedTo.addEventListener('change', function() {
         if (this.value) {
             assignedDateGroup.style.display = 'block';

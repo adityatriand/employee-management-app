@@ -17,10 +17,22 @@ class CheckLevel
      */
     public function handle(Request $request, Closure $next)
     {
-        if ((!Auth::guest()) && (Auth::user()->level == 1)) {
+        if (!Auth::check()) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
+            return redirect('/');
+        }
+
+        if (Auth::user()->level == 1) {
             return $next($request);
         }
-        return redirect('/');
+
+        // User is authenticated but not admin (level 0)
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json(['message' => 'Forbidden. Admin access required.'], 403);
+        }
+        return redirect('/')->with('error', 'Anda tidak memiliki akses untuk halaman ini');
     }
 }
 

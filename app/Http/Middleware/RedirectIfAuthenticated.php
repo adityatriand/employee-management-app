@@ -23,6 +23,19 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
+                $user = Auth::guard($guard)->user();
+                
+                // If user has a workspace, redirect to workspace dashboard
+                if ($user->workspace_id && $user->workspace) {
+                    return redirect()->route('workspace.dashboard', ['workspace' => $user->workspace->slug]);
+                }
+                
+                // If user doesn't have workspace yet, redirect to workspace setup
+                if (!$user->workspace_id) {
+                    return redirect()->route('workspace.setup');
+                }
+                
+                // Fallback to default home
                 return redirect(RouteServiceProvider::HOME);
             }
         }

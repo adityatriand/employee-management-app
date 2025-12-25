@@ -19,48 +19,85 @@ class AssetController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Asset::with(['assignedEmployee', 'assigner'])->orderBy('created_at', 'desc');
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $user = auth()->user();
+        $query = Asset::where('workspace_id', $workspace->id)
+            ->with(['assignedEmployee', 'assigner'])
+            ->orderBy('created_at', 'desc');
+
+        // For regular users (level 0), automatically filter to their assigned assets
+        if ($user->level == 0) {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if ($employee) {
+                $query->where('assigned_to', $employee->id);
+            } else {
+                // If no employee record, return empty result
+                $query->whereRaw('1 = 0');
+            }
+        } else {
+            // For admins, allow filters
+
+            // Filters
+            if ($request->filled('asset_type')) {
+                $query->where('asset_type', $request->asset_type);
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('assigned_to')) {
+                $query->where('assigned_to', $request->assigned_to);
+            }
+
+            if ($request->filled('department')) {
+                $query->where('department', $request->department);
+            }
+        }
 
         // Search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', '%' . $search . '%')
-                  ->orWhere('asset_tag', 'like', '%' . $search . '%')
-                  ->orWhere('serial_number', 'like', '%' . $search . '%')
-                  ->orWhere('brand', 'like', '%' . $search . '%')
-                  ->orWhere('model', 'like', '%' . $search . '%');
+                    ->orWhere('asset_tag', 'like', '%' . $search . '%')
+                    ->orWhere('serial_number', 'like', '%' . $search . '%')
+                    ->orWhere('brand', 'like', '%' . $search . '%')
+                    ->orWhere('model', 'like', '%' . $search . '%');
             });
         }
 
-        // Filters
-        if ($request->filled('asset_type')) {
-            $query->where('asset_type', $request->asset_type);
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('assigned_to')) {
-            $query->where('assigned_to', $request->assigned_to);
-        }
-
-        if ($request->filled('department')) {
-            $query->where('department', $request->department);
-        }
-
         $assets = $query->paginate(15);
-        $employees = Employee::orderBy('name')->get();
-        
-        // Get filter counts
-        $hasFilters = $request->filled(['search', 'asset_type', 'status', 'assigned_to', 'department']);
-        $filterCount = collect($request->only(['search', 'asset_type', 'status', 'assigned_to', 'department']))->filter()->count();
 
-        // Asset types for filter
-        $assetTypes = Asset::distinct()->pluck('asset_type')->sort()->values();
+        // Only get filter data for admins
+        if ($user->level == 1) {
+            $employees = Employee::where('workspace_id', $workspace->id)->orderBy('name')->get();
 
-        return view('assets.index', compact('assets', 'employees', 'assetTypes', 'hasFilters', 'filterCount'));
+            // Get filter counts
+            $hasFilters = $request->filled(['search', 'asset_type', 'status', 'assigned_to', 'department']);
+            $filterCount = collect($request->only(['search', 'asset_type', 'status', 'assigned_to', 'department']))->filter()->count();
+
+            // Asset types for filter (scoped to workspace)
+            $assetTypes = Asset::where('workspace_id', $workspace->id)
+                ->distinct()
+                ->pluck('asset_type')
+                ->sort()
+                ->values();
+        } else {
+            $employees = collect();
+            $hasFilters = false;
+            $filterCount = 0;
+            $assetTypes = collect();
+        }
+
+        return view('assets.index', compact('workspace', 'assets', 'employees', 'assetTypes', 'hasFilters', 'filterCount'));
     }
 
     /**
@@ -70,11 +107,16 @@ class AssetController extends Controller
      */
     public function create(Request $request)
     {
-        $employees = Employee::orderBy('name')->get();
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $employees = Employee::where('workspace_id', $workspace->id)->orderBy('name')->get();
         $selectedEmployeeId = $request->query('employee_id');
         $assetTag = Asset::generateAssetTag();
-        
-        return view('assets.create', compact('employees', 'selectedEmployeeId', 'assetTag'));
+
+        return view('assets.create', compact('workspace', 'employees', 'selectedEmployeeId', 'assetTag'));
     }
 
     /**
@@ -85,9 +127,14 @@ class AssetController extends Controller
      */
     public function store(Request $request)
     {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'asset_tag' => 'nullable|string|max:50|unique:assets,asset_tag',
+            'asset_tag' => 'nullable|string|max:50',
             'description' => 'nullable|string',
             'asset_type' => 'required|string|max:50',
             'serial_number' => 'nullable|string|max:100',
@@ -123,7 +170,8 @@ class AssetController extends Controller
             $fileName = Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'assets/' . $fileName;
 
-            Storage::disk('minio')->put($path, file_get_contents($file->getRealPath()));
+            $workspaceDisk = $workspace->getStorageDisk();
+            $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
 
             // Create file record for the image
             File::create([
@@ -136,7 +184,9 @@ class AssetController extends Controller
                 'category' => 'asset_image',
                 'description' => 'Foto aset untuk ' . $validated['name'],
                 'employee_id' => null,
+                'workspace_id' => $workspace->id,
                 'uploaded_by' => auth()->id(),
+                'workspace_id' => $workspace->id,
             ]);
 
             $validated['image'] = $path;
@@ -147,6 +197,7 @@ class AssetController extends Controller
             $validated['assigned_by'] = auth()->id();
         }
 
+        $validated['workspace_id'] = $workspace->id;
         $asset = Asset::create($validated);
 
         // Create assignment record if assigned
@@ -161,21 +212,42 @@ class AssetController extends Controller
         }
 
         return redirect()
-            ->route('assets.index')
+            ->route('workspace.assets.index', ['workspace' => $workspace->slug])
             ->with('success', 'Aset berhasil ditambahkan');
     }
 
     /**
      * Display the specified resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request, $asset)
     {
-        $asset = Asset::with(['assignedEmployee', 'assigner', 'assignments.employee', 'assignments.assigner', 'assignments.returner'])
-            ->findOrFail($id);
-        
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$assetParam);
+        }
+
+        $asset->load(['assignedEmployee', 'assigner', 'assignments.employee', 'assignments.assigner', 'assignments.returner']);
+
         // Get activity logs for this asset
         $activityLogs = \App\Models\ActivityLog::where('model_type', get_class($asset))
             ->where('model_id', $asset->id)
@@ -184,7 +256,7 @@ class AssetController extends Controller
             ->take(10)
             ->get();
 
-        return view('assets.show', compact('asset', 'activityLogs'));
+        return view('assets.show', compact('workspace', 'asset', 'activityLogs'));
     }
 
     /**
@@ -193,28 +265,52 @@ class AssetController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
-        $asset = Asset::findOrFail($id);
-        $employees = Employee::orderBy('name')->get();
-        
-        return view('assets.edit', compact('asset', 'employees'));
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $asset = Asset::where('workspace_id', $workspace->id)->findOrFail($id);
+        $employees = Employee::where('workspace_id', $workspace->id)->orderBy('name')->get();
+
+        return view('assets.edit', compact('workspace', 'asset', 'employees'));
     }
 
     /**
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $asset)
     {
-        $asset = Asset::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$assetParam);
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'asset_tag' => 'nullable|string|max:50|unique:assets,asset_tag,' . $id,
+            'asset_tag' => 'nullable|string|max:50',
             'description' => 'nullable|string',
             'asset_type' => 'required|string|max:50',
             'serial_number' => 'nullable|string|max:100',
@@ -237,18 +333,20 @@ class AssetController extends Controller
 
         // Handle image update to MinIO
         if ($request->hasFile('image')) {
+            $workspaceDisk = $workspace->getStorageDisk();
+
             // Delete old image from MinIO if it exists
-            if ($asset->image && Storage::disk('minio')->exists($asset->image)) {
-                Storage::disk('minio')->delete($asset->image);
+            if ($asset->image && $workspaceDisk->exists($asset->image)) {
+                $workspaceDisk->delete($asset->image);
                 // Also soft delete the old file record if it exists
-                File::where('file_path', $asset->image)->delete();
+                File::where('file_path', $asset->image)->where('workspace_id', $workspace->id)->delete();
             }
 
             $file = $request->file('image');
             $fileName = Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'assets/' . $fileName;
 
-            Storage::disk('minio')->put($path, file_get_contents($file->getRealPath()));
+            $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
 
             // Create new file record for the updated image
             File::create([
@@ -262,32 +360,64 @@ class AssetController extends Controller
                 'description' => 'Foto aset terbaru untuk ' . $validated['name'],
                 'employee_id' => null,
                 'uploaded_by' => auth()->id(),
+                'workspace_id' => $workspace->id,
             ]);
 
             $validated['image'] = $path;
         }
 
+        // Check asset_tag uniqueness within workspace
+        if ($request->filled('asset_tag') && $validated['asset_tag'] !== $asset->asset_tag) {
+            $exists = Asset::where('workspace_id', $workspace->id)
+                ->where('asset_tag', $validated['asset_tag'])
+                ->where('id', '!=', $asset->id)
+                ->exists();
+            if ($exists) {
+                return back()->withErrors(['asset_tag' => 'Asset tag sudah digunakan di workspace ini'])->withInput();
+            }
+        }
+
         $asset->update($validated);
 
         return redirect()
-            ->route('assets.index')
+            ->route('workspace.assets.index', ['workspace' => $workspace->slug])
             ->with('success', 'Aset berhasil diperbarui');
     }
 
     /**
      * Remove the specified resource from storage.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $asset)
     {
-        $asset = Asset::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$assetParam);
+        }
 
         // Check if asset is currently assigned
         if ($asset->status === 'assigned' && $asset->assigned_to) {
             return redirect()
-                ->route('assets.index')
+                ->route('workspace.assets.index', ['workspace' => $workspace->slug])
                 ->with('error', 'Tidak dapat menghapus aset yang sedang ditugaskan. Kembalikan aset terlebih dahulu.');
         }
 
@@ -295,23 +425,48 @@ class AssetController extends Controller
         $asset->delete();
 
         return redirect()
-            ->route('assets.index')
+            ->route('workspace.assets.index', ['workspace' => $workspace->slug])
             ->with('success', 'Aset berhasil dihapus (dapat dipulihkan)');
     }
 
     /**
      * Restore the specified soft-deleted resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function restore($id)
+    public function restore(Request $request, $asset)
     {
-        $asset = Asset::onlyTrashed()->findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail($asset->id);
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail((int)$assetParam);
+        }
         $asset->restore();
 
         \App\Models\ActivityLog::create([
             'user_id' => auth()->id(),
+            'workspace_id' => $asset->workspace_id,
             'model_type' => get_class($asset),
             'model_id' => $asset->id,
             'action' => 'restored',
@@ -319,7 +474,7 @@ class AssetController extends Controller
         ]);
 
         return redirect()
-            ->route('assets.index')
+            ->route('workspace.assets.index', ['workspace' => $workspace->slug])
             ->with('success', 'Aset berhasil dipulihkan');
     }
 
@@ -327,12 +482,31 @@ class AssetController extends Controller
      * Assign asset to employee.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function assign(Request $request, $id)
+    public function assign(Request $request, $asset)
     {
-        $asset = Asset::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$assetParam);
+        }
 
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -343,6 +517,14 @@ class AssetController extends Controller
             'employee_id.exists' => 'Pegawai tidak valid',
             'assigned_date.required' => 'Tanggal penugasan harus diisi',
         ]);
+
+        // Verify employee belongs to workspace
+        $employee = Employee::where('id', $validated['employee_id'])
+            ->where('workspace_id', $workspace->id)
+            ->first();
+        if (!$employee) {
+            return back()->withErrors(['employee_id' => 'Pegawai tidak valid untuk workspace ini'])->withInput();
+        }
 
         // Check if asset is available
         if ($asset->status !== 'available' && $asset->status !== 'assigned') {
@@ -357,7 +539,7 @@ class AssetController extends Controller
             $previousAssignment = AssetAssignment::where('asset_id', $asset->id)
                 ->whereNull('returned_at')
                 ->first();
-            
+
             if ($previousAssignment) {
                 $previousAssignment->update([
                     'returned_at' => now(),
@@ -385,19 +567,39 @@ class AssetController extends Controller
         ]);
 
         return redirect()
-            ->route('assets.show', $asset->id)
+            ->route('workspace.assets.show', ['workspace' => $workspace->slug, 'asset' => $asset->id])
             ->with('success', 'Aset berhasil ditugaskan');
     }
 
     /**
      * Unassign/return asset from employee.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function unassign($id)
+    public function unassign(Request $request, $asset)
     {
-        $asset = Asset::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$assetParam);
+        }
 
         if (!$asset->assigned_to) {
             return redirect()
@@ -426,7 +628,7 @@ class AssetController extends Controller
         ]);
 
         return redirect()
-            ->route('assets.show', $asset->id)
+            ->route('workspace.assets.show', ['workspace' => $workspace->slug, 'asset' => $asset->id])
             ->with('success', 'Aset berhasil dikembalikan');
     }
 }

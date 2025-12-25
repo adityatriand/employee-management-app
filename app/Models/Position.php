@@ -17,7 +17,16 @@ class Position extends Model
     protected $fillable = [
         'name',
         'description',
+        'workspace_id',
     ];
+
+    /**
+     * Get the workspace that owns the position
+     */
+    public function workspace()
+    {
+        return $this->belongsTo(Workspace::class);
+    }
 
     /**
      * Get all employees for this position

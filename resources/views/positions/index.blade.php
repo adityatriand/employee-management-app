@@ -5,7 +5,7 @@
     <div class="d-flex justify-content-between align-items-center">
         <h1 class="page-title">Data Jabatan</h1>
         @if(auth()->user()->level == 1)
-        <a href="{{ route('positions.create') }}" class="btn btn-success">
+        <a href="{{ route('workspace.positions.create', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
             <i class="oi oi-plus"></i> Tambah Jabatan
         </a>
         @endif
@@ -38,12 +38,12 @@
                         <td class="text-center">
                             @if(auth()->user()->level == 1)
                             <div class="action-buttons">
-                                <a href="{{ route('positions.edit', $position->id) }}" 
+                                <a href="{{ route('workspace.positions.edit', ['workspace' => $workspace->slug, 'position' => $position->id]) }}" 
                                    class="btn-action btn-edit" title="Edit">
                                     <i class="oi oi-pencil"></i>
                                     <span>Edit</span>
                                 </a>
-                                <form action="{{ route('positions.destroy', $position->id) }}" 
+                                <form action="{{ route('workspace.positions.destroy', ['workspace' => $workspace->slug, 'position' => $position->id]) }}" 
                                       method="POST" class="d-inline"
                                       onsubmit="return confirm('Apakah Anda yakin ingin menghapus jabatan ini?');">
                                     @csrf
@@ -77,7 +77,7 @@
         <div class="text-center py-5">
             <i class="oi oi-briefcase" style="font-size: 4rem; color: #cbd5e1;"></i>
             <p class="mt-3 text-muted">Belum ada data jabatan</p>
-            <a href="{{ route('positions.create') }}" class="btn btn-success">
+            <a href="{{ route('workspace.positions.create', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
                 <i class="oi oi-plus"></i> Tambah Jabatan Pertama
             </a>
         </div>

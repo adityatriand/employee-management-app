@@ -32,6 +32,12 @@
         <div class="auth-card">
             <div class="auth-logo">
                 <img src="{{ asset('images/logo.png') }}" alt="WorkforceHub" class="auth-main-logo" onerror="this.style.display='none'">
+                 @if(isset($workspace) && $workspace->logo)
+                <img src="{{ $workspace->logo_url }}"
+                     alt="{{ $workspace->name }}"
+                     class="auth-main-logo"
+                     onerror="console.error('Logo failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                 @endif
             </div>
             @yield('content')
         </div>

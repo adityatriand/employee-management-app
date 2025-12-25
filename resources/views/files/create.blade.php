@@ -7,7 +7,7 @@
             <h1 class="page-title mb-0">Upload File</h1>
         </div>
         <div>
-             <a href="{{ route('files.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
+             <a href="{{ route('workspace.files.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
                 <i class="oi oi-chevron-left"></i> Kembali
             </a>
         </div>
@@ -21,7 +21,7 @@
                 <h5 class="mb-0">Form Upload File</h5>
             </div>
             <div class="card-body">
-                <form action="{{ route('files.store') }}" method="POST" enctype="multipart/form-data" id="fileUploadForm">
+                <form action="{{ route('workspace.files.store', ['workspace' => $workspace->slug]) }}" method="POST" enctype="multipart/form-data" id="fileUploadForm">
                     @csrf
 
                     <div class="mb-4">
@@ -123,7 +123,7 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="oi oi-cloud-upload"></i> Upload File
                         </button>
-                        <a href="{{ route('files.index') }}" class="btn btn-outline-secondary">
+                        <a href="{{ route('workspace.files.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary">
                             Batal
                         </a>
                     </div>

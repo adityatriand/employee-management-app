@@ -20,7 +20,7 @@
         </div>
         @endif
 
-        <form action="{{ route('positions.update', $position->id) }}" method="POST">
+        <form action="{{ route('workspace.positions.update', ['workspace' => $workspace->slug, 'position' => $position->id]) }}" method="POST">
             @csrf
             @method('PUT')
             <div class="mb-4">
@@ -41,7 +41,7 @@
                 <button type="submit" class="btn btn-primary">
                     <i class="oi oi-check"></i> Update
                 </button>
-                <a href="{{ route('positions.index') }}" class="btn btn-secondary">
+                <a href="{{ route('workspace.positions.index', ['workspace' => $workspace->slug]) }}" class="btn btn-secondary">
                     <i class="oi oi-x"></i> Batal
                 </a>
             </div>

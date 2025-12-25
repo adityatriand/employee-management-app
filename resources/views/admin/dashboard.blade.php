@@ -165,16 +165,16 @@
             <div class="card-body">
                 <p class="text-muted mb-3">Anda memiliki akses penuh untuk mengelola data pegawai dan jabatan dalam sistem.</p>
                 <div class="d-flex gap-2 flex-wrap">
-                    <a href="{{ route('employees.index') }}" class="btn btn-primary">
+                    <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-primary">
                         <i class="oi oi-people"></i> Kelola Pegawai
                     </a>
-                    <a href="{{ route('positions.index') }}" class="btn btn-success">
+                    <a href="{{ route('workspace.positions.index', ['workspace' => $workspace->slug]) }}" class="btn btn-success">
                         <i class="oi oi-briefcase"></i> Kelola Jabatan
                     </a>
-                    <a href="{{ route('employees.create') }}" class="btn btn-outline-primary">
+                    <a href="{{ route('workspace.employees.create', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-primary">
                         <i class="oi oi-plus"></i> Tambah Pegawai
                     </a>
-                    <a href="{{ route('positions.create') }}" class="btn btn-outline-success">
+                    <a href="{{ route('workspace.positions.create', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-success">
                         <i class="oi oi-plus"></i> Tambah Jabatan
                     </a>
                 </div>
@@ -189,7 +189,7 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Pegawai Terbaru</h5>
-        <a href="{{ route('employees.index') }}" class="btn btn-sm btn-outline-primary">
+        <a href="{{ route('workspace.employees.index', ['workspace' => $workspace->slug]) }}" class="btn btn-sm btn-outline-primary">
             Lihat Semua <i class="oi oi-chevron-right"></i>
         </a>
     </div>
@@ -212,14 +212,14 @@
                     <tr>
                         <td>{{ $index + 1 }}</td>
                         <td>
-                            <a href="{{ route('employees.show', $employee->id) }}">
+                            <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}">
                                 <img src="{{ $employee->photo_url }}"
                                      alt="{{ $employee->name }}"
                                      class="employee-photo">
                             </a>
                         </td>
                         <td>
-                            <a href="{{ route('employees.show', $employee->id) }}" class="employee-name-link">
+                            <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" class="employee-name-link">
                                 <strong>{{ $employee->name }}</strong>
                             </a>
                         </td>

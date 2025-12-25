@@ -18,8 +18,15 @@ class EmployeeSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
 
-        // Get position IDs
-        $positionIds = DB::table('positions')->pluck('id')->toArray();
+        // Get or create demo workspace
+        $workspace = \App\Models\Workspace::where('slug', 'demo-workspace')->first();
+        if (!$workspace) {
+            $this->command->warn('Demo workspace not found. Please run UserSeeder first.');
+            return;
+        }
+
+        // Get position IDs for this workspace
+        $positionIds = \App\Models\Position::where('workspace_id', $workspace->id)->pluck('id')->toArray();
 
         if (empty($positionIds)) {
             $this->command->warn('No positions found. Please run PositionSeeder first.');
@@ -31,13 +38,14 @@ class EmployeeSeeder extends Seeder
             $gender = $faker->randomElement(['L', 'P']);
             $genderName = $gender === 'L' ? 'male' : 'female';
 
-            DB::table('employees')->insert([
+            \App\Models\Employee::create([
                 'name' => $faker->name($genderName),
                 'gender' => $gender,
                 'birth_date' => $faker->date('Y-m-d', '-25 years', '-18 years'),
                 'position_id' => $faker->randomElement($positionIds),
                 'photo' => '', // You can add photo upload logic here
                 'description' => $faker->sentence(10),
+                'workspace_id' => $workspace->id,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

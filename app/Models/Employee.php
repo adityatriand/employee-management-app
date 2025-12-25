@@ -21,11 +21,30 @@ class Employee extends Model
         'photo',
         'description',
         'position_id',
+        'workspace_id',
+        'user_id',
+        'email', // For creating user account
     ];
 
     protected $casts = [
         'birth_date' => 'date',
     ];
+
+    /**
+     * Get the workspace that owns the employee
+     */
+    public function workspace()
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    /**
+     * Get the user account linked to this employee
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * Get the position that owns the employee
@@ -74,15 +93,23 @@ class Employee extends Model
      */
     public function getPhotoUrlAttribute()
     {
+        // Get workspace slug for route generation
+        $workspaceSlug = $this->workspace ? $this->workspace->slug : (auth()->check() && auth()->user()->workspace ? auth()->user()->workspace->slug : null);
+        
+        if (!$workspaceSlug) {
+            // Return placeholder if no workspace
+            $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60"><rect width="60" height="60" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/><circle cx="30" cy="22" r="8" fill="#cbd5e1"/><path d="M15 50 Q15 40 30 40 Q45 40 45 50" fill="#cbd5e1"/></svg>';
+            return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        }
+
         // First, try to get photo from MinIO via File relationship
         $photoFile = $this->photoFile;
         if ($photoFile) {
             try {
-                if ($photoFile->exists) {
-                    return $photoFile->url;
-                }
+                // Use employee photo route instead of file route
+                return route('workspace.storage.employees.photo', ['workspace' => $workspaceSlug, 'employee' => $this->id]);
             } catch (\Exception $e) {
-                // Fallback if MinIO is not available
+                // Fallback if route generation fails
             }
         }
 
@@ -91,9 +118,8 @@ class Employee extends Model
             $file = \App\Models\File::find($this->photo);
             if ($file && $file->file_type === 'photo') {
                 try {
-                    if ($file->exists) {
-                        return $file->url;
-                    }
+                    // Use employee photo route instead of file route
+                    return route('workspace.storage.employees.photo', ['workspace' => $workspaceSlug, 'employee' => $this->id]);
                 } catch (\Exception $e) {
                     // Fallback
                 }

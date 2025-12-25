@@ -8,7 +8,7 @@
 <!-- Filter Section -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="GET" action="{{ route('activity-logs.index') }}" id="filterForm">
+        <form method="GET" action="{{ route('workspace.activity-logs.index', ['workspace' => $workspace->slug]) }}" id="filterForm">
             <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label fw-bold small">Pengguna</label>
@@ -56,7 +56,7 @@
                 <button type="submit" class="btn btn-primary btn-sm me-2">
                     <i class="oi oi-filter"></i> Terapkan Filter
                 </button>
-                <a href="{{ route('activity-logs.index') }}" class="btn btn-outline-secondary btn-sm">
+                <a href="{{ route('workspace.activity-logs.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm">
                     <i class="oi oi-reload"></i> Reset
                 </a>
             </div>
@@ -108,7 +108,7 @@
                             <small class="text-muted">{{ $log->created_at->format('d/m/Y H:i') }}</small>
                         </td>
                         <td class="text-center">
-                            <a href="{{ route('activity-logs.show', $log->id) }}" class="btn btn-sm btn-outline-primary" title="Lihat Detail">
+                            <a href="{{ route('workspace.activity-logs.show', ['workspace' => $workspace->slug, 'activityLog' => $log->id]) }}" class="btn btn-sm btn-outline-primary" title="Lihat Detail">
                                 <i class="oi oi-eye"></i>
                             </a>
                         </td>

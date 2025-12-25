@@ -28,9 +28,17 @@ class ActivityLogController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ActivityLog::with('user')->orderBy('created_at', 'desc');
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
 
-        // Filter by user
+        // Filter by workspace_id directly
+        $query = ActivityLog::where('workspace_id', $workspace->id)
+            ->with('user')
+            ->orderBy('created_at', 'desc');
+
+        // Filter by user (scoped to workspace)
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
         }
@@ -55,9 +63,10 @@ class ActivityLogController extends Controller
 
         $activityLogs = $query->paginate(20)->appends($request->query());
 
-        // Get filter options
-        $users = User::orderBy('name', 'asc')->get();
-        $modelTypes = ActivityLog::select('model_type')
+        // Get filter options (scoped to workspace)
+        $users = User::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
+        $modelTypes = ActivityLog::where('workspace_id', $workspace->id)
+            ->select('model_type')
             ->distinct()
             ->orderBy('model_type', 'asc')
             ->pluck('model_type')
@@ -78,6 +87,7 @@ class ActivityLogController extends Controller
                      $request->filled('date_to');
 
         return view('activity-logs.index', compact(
+            'workspace',
             'activityLogs',
             'users',
             'modelTypes',
@@ -89,14 +99,22 @@ class ActivityLogController extends Controller
     /**
      * Display the specified activity log.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $activityLog = ActivityLog::with('user')->findOrFail($id);
-        
-        return view('activity-logs.show', compact('activityLog'));
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $activityLog = ActivityLog::where('workspace_id', $workspace->id)
+            ->with('user')
+            ->findOrFail($id);
+
+        return view('activity-logs.show', compact('workspace', 'activityLog'));
     }
 }
 

@@ -7,9 +7,15 @@
             <h1 class="page-title mb-0">Detail File</h1>
         </div>
         <div>
-            <a href="{{ route('files.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            @if(auth()->user()->level == 1)
+            <a href="{{ route('workspace.files.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
                 <i class="oi oi-chevron-left"></i> Kembali
             </a>
+            @else
+            <a href="{{ route('workspace.dashboard', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
+                <i class="oi oi-chevron-left"></i> Kembali
+            </a>
+            @endif
         </div>
     </div>
 </div>
@@ -56,7 +62,7 @@
                     <div class="info-item">
                         <div class="info-label">Pegawai</div>
                         <div class="info-value">
-                            <a href="{{ route('employees.show', $file->employee->id) }}" class="text-decoration-none">
+                            <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $file->employee->id]) }}" class="text-decoration-none">
                                 {{ $file->employee->name }}
                             </a>
                         </div>
@@ -94,19 +100,19 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="{{ route('files.download', $file->id) }}" class="btn btn-primary">
+                    <a href="{{ route('workspace.files.download', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" class="btn btn-primary">
                         <i class="oi oi-data-transfer-download"></i> Download File
                     </a>
                     @if($file->employee)
-                    <a href="{{ route('employees.show', $file->employee->id) }}" class="btn btn-outline-info">
+                    <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $file->employee->id]) }}" class="btn btn-outline-info">
                         <i class="oi oi-person"></i> Lihat Pegawai
                     </a>
                     @endif
-                    <a href="{{ route('files.index') }}" class="btn btn-outline-secondary">
+                    <a href="{{ route('workspace.files.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary">
                         <i class="oi oi-list"></i> Kembali ke Daftar
                     </a>
                     @if(auth()->user()->level == 1)
-                    <form action="{{ route('files.destroy', $file->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
+                    <form action="{{ route('workspace.files.destroy', ['workspace' => $workspace->slug, 'file' => $file->id]) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus file ini?');">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-outline-danger w-100">
@@ -127,7 +133,7 @@
             <i class="oi oi-clock"></i> Riwayat Aktivitas
         </h5>
         @if(auth()->user()->level == 1)
-        <a href="{{ route('activity-logs.index', ['model_type' => get_class($file), 'model_id' => $file->id]) }}" class="btn btn-sm btn-outline-primary">
+        <a href="{{ route('workspace.activity-logs.index', array_merge(['workspace' => $workspace->slug], ['model_type' => get_class($file), 'model_id' => $file->id])) }}" class="btn btn-sm btn-outline-primary">
             Lihat Semua <i class="oi oi-chevron-right"></i>
         </a>
         @endif

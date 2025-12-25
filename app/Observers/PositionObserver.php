@@ -18,6 +18,7 @@ class PositionObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $position->workspace_id,
             'model_type' => get_class($position),
             'model_id' => $position->id,
             'action' => 'created',
@@ -45,6 +46,7 @@ class PositionObserver
         if (!empty($oldValues)) {
             ActivityLog::create([
                 'user_id' => Auth::id(),
+                'workspace_id' => $position->workspace_id,
                 'model_type' => get_class($position),
                 'model_id' => $position->id,
                 'action' => 'updated',
@@ -65,6 +67,7 @@ class PositionObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $position->workspace_id,
             'model_type' => get_class($position),
             'model_id' => $position->id,
             'action' => 'deleted',
@@ -83,6 +86,7 @@ class PositionObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $position->workspace_id,
             'model_type' => get_class($position),
             'model_id' => $position->id,
             'action' => 'restored',

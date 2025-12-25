@@ -7,9 +7,15 @@
             <h1 class="page-title mb-0">Detail Aset</h1>
         </div>
         <div>
-            <a href="{{ route('assets.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
-                <i class="oi oi-chevron-left"></i> Kembali
-            </a>
+            @if(auth()->user()->level == 1)
+                <a href="{{ route('workspace.assets.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="oi oi-chevron-left"></i> Kembali
+                </a>
+            @else
+                <a href="{{ route('workspace.dashboard', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="oi oi-chevron-left"></i> Kembali
+                </a>
+            @endif
         </div>
     </div>
 </div>
@@ -43,17 +49,17 @@
                         <i class="oi oi-person"></i> Tugaskan ke Pegawai
                     </button>
                     @elseif($asset->status == 'assigned' && $asset->assigned_to)
-                    <form action="{{ route('assets.unassign', $asset->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin mengembalikan aset ini?');">
+                    <form action="{{ route('workspace.assets.unassign', ['workspace' => $workspace->slug, 'asset' => $asset->id]) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin mengembalikan aset ini?');">
                         @csrf
                         <button type="submit" class="btn btn-warning w-100">
                             <i class="oi oi-reload"></i> Kembalikan Aset
                         </button>
                     </form>
                     @endif
-                    <a href="{{ route('assets.edit', $asset->id) }}" class="btn btn-outline-primary">
+                    <a href="{{ route('workspace.assets.edit', ['workspace' => $workspace->slug, 'asset' => $asset->id]) }}" class="btn btn-outline-primary">
                         <i class="oi oi-pencil"></i> Edit Aset
                     </a>
-                    <form action="{{ route('assets.destroy', $asset->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus aset ini?');">
+                    <form action="{{ route('workspace.assets.destroy', ['workspace' => $workspace->slug, 'asset' => $asset->id]) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus aset ini?');">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-outline-danger w-100">
@@ -189,7 +195,7 @@
                     <div class="info-item">
                         <div class="info-label">Ditugaskan ke</div>
                         <div class="info-value">
-                            <a href="{{ route('employees.show', $asset->assignedEmployee->id) }}" class="text-decoration-none">
+                            <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $asset->assignedEmployee->id]) }}" class="text-decoration-none">
                                 {{ $asset->assignedEmployee->name }}
                             </a>
                         </div>
@@ -231,7 +237,7 @@
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="mb-1">
-                                        <a href="{{ route('employees.show', $assignment->employee->id) }}" class="text-decoration-none">
+                                        <a href="{{ route('workspace.employees.show', ['workspace' => $workspace->slug, 'employee' => $assignment->employee->id]) }}" class="text-decoration-none">
                                             {{ $assignment->employee->name }}
                                         </a>
                                     </h6>
@@ -268,7 +274,7 @@
                     <i class="oi oi-clock"></i> Riwayat Aktivitas
                 </h5>
                 @if(auth()->user()->level == 1)
-                <a href="{{ route('activity-logs.index', ['model_type' => get_class($asset), 'model_id' => $asset->id]) }}" class="btn btn-sm btn-outline-primary">
+                <a href="{{ route('workspace.activity-logs.index', array_merge(['workspace' => $workspace->slug], ['model_type' => get_class($asset), 'model_id' => $asset->id])) }}" class="btn btn-sm btn-outline-primary">
                     Lihat Semua <i class="oi oi-chevron-right"></i>
                 </a>
                 @endif
@@ -320,7 +326,7 @@
 <div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form action="{{ route('assets.assign', $asset->id) }}" method="POST">
+            <form action="{{ route('workspace.assets.assign', ['workspace' => $workspace->slug, 'asset' => $asset->id]) }}" method="POST">
                 @csrf
                 <div class="modal-header">
                     <h5 class="modal-title" id="assignModalLabel">Tugaskan Aset ke Pegawai</h5>

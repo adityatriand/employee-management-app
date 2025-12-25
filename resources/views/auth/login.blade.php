@@ -1,6 +1,12 @@
 @extends('layouts.auth')
 
 @section('content')
+@if(isset($workspace))
+<div class="text-center mb-4">
+    <h2 class="text-black mb-2">{{ $workspace->name }}</h2>
+</div>
+@endif
+
 <h1 class="auth-title">Masuk</h1>
 <p class="auth-subtitle">Silakan masuk ke akun Anda</p>
 
@@ -14,18 +20,18 @@
 </div>
 @endif
 
-<form method="POST" action="{{ route('login') }}">
+<form method="POST" action="{{ route('workspace.login.post', ['workspace' => $workspace->slug]) }}">
     @csrf
 
     <div class="mb-3">
         <label for="email" class="form-label fw-bold">Alamat Email</label>
-        <input id="email" 
-               type="email" 
-               class="form-control @error('email') is-invalid @enderror" 
-               name="email" 
-               value="{{ old('email') }}" 
-               required 
-               autocomplete="email" 
+        <input id="email"
+               type="email"
+               class="form-control @error('email') is-invalid @enderror"
+               name="email"
+               value="{{ old('email') }}"
+               required
+               autocomplete="email"
                autofocus
                placeholder="nama@email.com">
         @error('email')
@@ -37,11 +43,11 @@
 
     <div class="mb-3">
         <label for="password" class="form-label fw-bold">Kata Sandi</label>
-        <input id="password" 
-               type="password" 
-               class="form-control @error('password') is-invalid @enderror" 
-               name="password" 
-               required 
+        <input id="password"
+               type="password"
+               class="form-control @error('password') is-invalid @enderror"
+               name="password"
+               required
                autocomplete="current-password"
                placeholder="Masukkan kata sandi">
         @error('password')
@@ -70,11 +76,6 @@
             Lupa Kata Sandi?
         </a>
         @endif
-
-        <div class="text-center mt-3">
-            <span class="text-muted">Belum punya akun? </span>
-            <a href="{{ route('register') }}" class="text-primary">Daftar Sekarang</a>
-        </div>
     </div>
 </form>
 @endsection

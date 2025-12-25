@@ -7,7 +7,7 @@
             <h1 class="page-title mb-0">Edit Aset</h1>
         </div>
         <div>
-            <a href="{{ route('assets.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            <a href="{{ route('workspace.assets.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary btn-sm mb-2">
                 <i class="oi oi-chevron-left"></i> Kembali
             </a>
         </div>
@@ -31,7 +31,7 @@
                 </div>
                 @endif
 
-                <form action="{{ route('assets.update', $asset->id) }}" method="POST" enctype="multipart/form-data" id="assetForm">
+                <form action="{{ route('workspace.assets.update', ['workspace' => $workspace->slug, 'asset' => $asset->id]) }}" method="POST" enctype="multipart/form-data" id="assetForm">
                     @method('PUT')
                     @csrf
 
@@ -318,7 +318,7 @@
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('assets.index') }}" class="btn btn-outline-secondary">Batal</a>
+                        <a href="{{ route('workspace.assets.index', ['workspace' => $workspace->slug]) }}" class="btn btn-outline-secondary">Batal</a>
                         <button type="submit" class="btn btn-primary">
                             <i class="oi oi-check"></i> Simpan
                         </button>

@@ -18,6 +18,7 @@ class EmployeeObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $employee->workspace_id,
             'model_type' => get_class($employee),
             'model_id' => $employee->id,
             'action' => 'created',
@@ -45,6 +46,7 @@ class EmployeeObserver
         if (!empty($oldValues)) {
             ActivityLog::create([
                 'user_id' => Auth::id(),
+                'workspace_id' => $employee->workspace_id,
                 'model_type' => get_class($employee),
                 'model_id' => $employee->id,
                 'action' => 'updated',
@@ -65,6 +67,7 @@ class EmployeeObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $employee->workspace_id,
             'model_type' => get_class($employee),
             'model_id' => $employee->id,
             'action' => 'deleted',
@@ -83,6 +86,7 @@ class EmployeeObserver
     {
         ActivityLog::create([
             'user_id' => Auth::id(),
+            'workspace_id' => $employee->workspace_id,
             'model_type' => get_class($employee),
             'model_id' => $employee->id,
             'action' => 'restored',

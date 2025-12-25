@@ -19,7 +19,13 @@ class EmployeeController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Employee::with('position');
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $query = Employee::where('workspace_id', $workspace->id)
+            ->with('position');
 
         // Search by name
         if ($request->filled('search')) {
@@ -59,8 +65,10 @@ class EmployeeController extends Controller
             ->paginate(10)
             ->appends($request->query());
 
-        // Get positions for filter dropdown
-        $positions = Position::orderBy('name', 'asc')->get();
+        // Get positions for filter dropdown (scoped to workspace)
+        $positions = Position::where('workspace_id', $workspace->id)
+            ->orderBy('name', 'asc')
+            ->get();
         
         // Calculate filter status
         $hasFilters = $request->filled('search') ||
@@ -78,7 +86,7 @@ class EmployeeController extends Controller
         if ($request->filled('birth_date_from') || $request->filled('birth_date_to')) $filterCount++;
         if ($request->filled('created_from') || $request->filled('created_to')) $filterCount++;
         
-        return view('employees.index', compact('employees', 'positions', 'hasFilters', 'filterCount'));
+        return view('employees.index', compact('workspace', 'employees', 'positions', 'hasFilters', 'filterCount'));
     }
 
     /**
@@ -86,10 +94,15 @@ class EmployeeController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(Request $request)
     {
-        $positions = Position::orderBy('name', 'asc')->get();
-        return view('employees.create', compact('positions'));
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $positions = Position::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
+        return view('employees.create', compact('positions', 'workspace'));
     }
 
     /**
@@ -100,8 +113,14 @@ class EmployeeController extends Controller
      */
     public function store(Request $request)
     {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'email' => 'nullable|email|unique:users,email',
             'gender' => 'required|in:L,P',
             'birth_date' => 'required|date',
             'position_id' => 'required|exists:positions,id',
@@ -109,6 +128,8 @@ class EmployeeController extends Controller
             'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
         ], [
             'name.required' => 'Nama pegawai tidak boleh kosong',
+            'email.email' => 'Format email tidak valid',
+            'email.unique' => 'Email sudah terdaftar',
             'gender.required' => 'Jenis kelamin tidak boleh kosong',
             'birth_date.required' => 'Tanggal lahir tidak boleh kosong',
             'position_id.required' => 'Jabatan harus diisi',
@@ -119,14 +140,37 @@ class EmployeeController extends Controller
             'photo.max' => 'Ukuran foto maksimal 2MB',
         ]);
 
+        // Verify position belongs to workspace
+        $position = \App\Models\Position::where('id', $validated['position_id'])
+            ->where('workspace_id', $workspace->id)
+            ->first();
+        
+        if (!$position) {
+            return back()->withErrors(['position_id' => 'Jabatan tidak valid untuk workspace ini'])->withInput();
+        }
+
+        // Create user account if email is provided
+        $user = null;
+        if ($request->filled('email')) {
+            $user = \App\Models\User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => \Illuminate\Support\Facades\Hash::make('password123'), // Default password, should be changed on first login
+                'level' => 0, // Regular user
+                'workspace_id' => $workspace->id,
+            ]);
+        }
+
         // Handle file upload to MinIO
+        $fileRecord = null;
         if ($request->hasFile('photo')) {
             $file = $request->file('photo');
             $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'photos/' . $fileName;
             
-            // Upload to MinIO
-            \Illuminate\Support\Facades\Storage::disk('minio')->put($path, file_get_contents($file->getRealPath()));
+            // Upload to MinIO using workspace-specific bucket
+            $workspaceDisk = $workspace->getStorageDisk();
+            $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
             
             // Create file record
             $fileRecord = \App\Models\File::create([
@@ -137,66 +181,157 @@ class EmployeeController extends Controller
                 'file_size' => $file->getSize(),
                 'file_type' => 'photo',
                 'employee_id' => null, // Will be set after employee is created
+                'workspace_id' => $workspace->id,
                 'uploaded_by' => auth()->id(),
+                'workspace_id' => $workspace->id,
             ]);
             
             // Store file ID in employee record (for backward compatibility)
             $validated['photo'] = $fileRecord->id;
-            
-            // After creating employee, link the file
-            $employee = Employee::create($validated);
-            $fileRecord->update(['employee_id' => $employee->id]);
-            
-            return redirect()
-                ->route('employees.index')
-                ->with('success', 'Data berhasil ditambahkan');
         }
-
-        Employee::create($validated);
-
+        
+        // Create employee with workspace_id and user_id
+        $validated['workspace_id'] = $workspace->id;
+        if ($user) {
+            $validated['user_id'] = $user->id;
+        }
+        unset($validated['email']); // Remove email from employee fillable
+        
+        $employee = Employee::create($validated);
+        
+        // Link file to employee
+        if ($fileRecord) {
+            $fileRecord->update(['employee_id' => $employee->id]);
+        }
+        
+        $workspaceSlug = $workspace->slug;
+        $message = 'Data berhasil ditambahkan';
+        if ($user) {
+            $message .= '. Akun pengguna telah dibuat dengan email: ' . $user->email . ' (password default: password123)';
+        }
+        
         return redirect()
-            ->route('employees.index')
-            ->with('success', 'Data berhasil ditambahkan');
+            ->route('workspace.employees.index', ['workspace' => $workspaceSlug])
+            ->with('success', $message);
     }
 
     /**
      * Display the specified resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $employee Employee ID or Employee model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request, $employee)
     {
-        $employee = Employee::with(['position', 'files', 'assets'])->findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $employeeParam = $routeParams['employee'] ?? $employee;
+        
+        // If it's already an Employee model instance, use it; otherwise find by ID
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+            // Verify workspace access
+            if ($employee->workspace_id !== $workspace->id) {
+                abort(404, 'Employee not found');
+            }
+        } else {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$employeeParam);
+        }
+        
+        // Load relationships
+        $employee->load(['position', 'files', 'assets', 'user']);
+        
+        // Regular users can only view their own profile
+        if (auth()->user()->level == 0 && $employee->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses ke profil ini');
+        }
+        
         $files = $employee->files()->orderBy('created_at', 'desc')->get();
         $assets = $employee->assets()->orderBy('assigned_date', 'desc')->get();
-        return view('employees.show', compact('employee', 'files', 'assets'));
+        return view('employees.show', compact('workspace', 'employee', 'files', 'assets'));
     }
 
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $employee Employee ID or Employee model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Request $request, $employee)
     {
-        $employee = Employee::findOrFail($id);
-        $positions = Position::orderBy('name', 'asc')->get();
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
 
-        return view('employees.edit', compact('employee', 'positions'));
+        // Get employee from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $employeeParam = $routeParams['employee'] ?? $employee;
+        
+        // If it's already an Employee model instance, use it; otherwise find by ID
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+            // Verify workspace access
+            if ($employee->workspace_id !== $workspace->id) {
+                abort(404, 'Employee not found');
+            }
+        } else {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$employeeParam);
+        }
+        
+        // Regular users can only edit their own profile
+        if (auth()->user()->level == 0 && $employee->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengedit profil ini');
+        }
+
+        $positions = Position::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
+
+        return view('employees.edit', compact('workspace', 'employee', 'positions'));
     }
 
     /**
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
+     * @param  mixed $employee Employee ID or Employee model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $employee)
     {
-        $employee = Employee::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $employeeParam = $routeParams['employee'] ?? $employee;
+        
+        // If it's already an Employee model instance, use it; otherwise find by ID
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+            // Verify workspace access
+            if ($employee->workspace_id !== $workspace->id) {
+                abort(404, 'Employee not found');
+            }
+        } else {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$employeeParam);
+        }
+        
+        // Regular users can only edit their own profile
+        if (auth()->user()->level == 0 && $employee->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengedit profil ini');
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -228,8 +363,13 @@ class EmployeeController extends Controller
             $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'photos/' . $fileName;
             
-            // Upload to MinIO
-            \Illuminate\Support\Facades\Storage::disk('minio')->put($path, file_get_contents($file->getRealPath()));
+            // Upload to MinIO using workspace-specific bucket
+            $workspace = $request->get('workspace');
+            if (!$workspace) {
+                abort(404, 'Workspace not found');
+            }
+            $workspaceDisk = $workspace->getStorageDisk();
+            $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
             
             // Create file record
             $fileRecord = \App\Models\File::create([
@@ -240,6 +380,127 @@ class EmployeeController extends Controller
                 'file_size' => $file->getSize(),
                 'file_type' => 'photo',
                 'employee_id' => $employee->id,
+                'workspace_id' => $workspace->id,
+                'uploaded_by' => auth()->id(),
+                'workspace_id' => $workspace->id,
+            ]);
+            
+            // Store file ID in employee record (for backward compatibility)
+            $validated['photo'] = $fileRecord->id;
+        }
+
+        $employee->update($validated);
+
+        $workspaceSlug = $workspace->slug;
+        $workspaceSlug = $workspace->slug;
+        
+        // If regular user editing own profile, redirect to dashboard
+        if (auth()->user()->level == 0 && $employee->user_id === auth()->id()) {
+            return redirect()
+                ->route('workspace.dashboard', ['workspace' => $workspaceSlug])
+                ->with('success', 'Profil berhasil diperbarui');
+        }
+        
+        return redirect()
+            ->route('workspace.employees.index', ['workspace' => $workspaceSlug])
+            ->with('success', 'Data berhasil diedit');
+    }
+
+    /**
+     * Show the form for editing own profile (regular users only).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function editProfile(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Only regular users can access this
+        if ($user->level != 0) {
+            abort(403, 'Hanya pengguna biasa yang dapat mengakses halaman ini');
+        }
+
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee record for this user
+        $employee = Employee::where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        return view('employees.edit-profile', compact('workspace', 'employee'));
+    }
+
+    /**
+     * Update own profile (regular users only - limited fields).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Only regular users can access this
+        if ($user->level != 0) {
+            abort(403, 'Hanya pengguna biasa yang dapat mengakses halaman ini');
+        }
+
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee record for this user
+        $employee = Employee::where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        // Only allow editing: name, gender, birth_date, and photo
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'gender' => 'required|in:L,P',
+            'birth_date' => 'required|date',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ], [
+            'name.required' => 'Nama tidak boleh kosong',
+            'gender.required' => 'Jenis kelamin tidak boleh kosong',
+            'gender.in' => 'Jenis kelamin harus Laki-Laki (L) atau Perempuan (P)',
+            'birth_date.required' => 'Tanggal lahir tidak boleh kosong',
+            'birth_date.date' => 'Tanggal lahir harus berupa tanggal yang valid',
+            'photo.image' => 'File harus berupa gambar',
+            'photo.max' => 'Ukuran foto maksimal 2MB',
+        ]);
+
+        // Handle file upload if new photo is provided
+        if ($request->hasFile('photo')) {
+            // Delete old photo file if exists
+            $oldPhoto = $employee->photoFile;
+            if ($oldPhoto) {
+                $oldPhoto->delete(); // Soft delete old photo
+            }
+
+            $file = $request->file('photo');
+            $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = 'photos/' . $fileName;
+            
+            // Upload to MinIO using workspace-specific bucket
+            $workspaceDisk = $workspace->getStorageDisk();
+            $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
+            
+            // Create file record
+            $fileRecord = \App\Models\File::create([
+                'name' => $file->getClientOriginalName(),
+                'file_name' => $fileName,
+                'file_path' => $path,
+                'mime_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'file_type' => 'photo',
+                'employee_id' => $employee->id,
+                'workspace_id' => $workspace->id,
                 'uploaded_by' => auth()->id(),
             ]);
             
@@ -249,26 +510,47 @@ class EmployeeController extends Controller
 
         $employee->update($validated);
 
+        $workspaceSlug = $workspace->slug;
         return redirect()
-            ->route('employees.index')
-            ->with('success', 'Data berhasil diedit');
+            ->route('workspace.dashboard', ['workspace' => $workspaceSlug])
+            ->with('success', 'Profil berhasil diperbarui');
     }
 
     /**
      * Remove the specified resource from storage.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $employee)
     {
-        $employee = Employee::findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $employeeParam = $routeParams['employee'] ?? $employee;
+        
+        // If it's already an Employee model instance, use it; otherwise find by ID
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+            // Verify workspace access
+            if ($employee->workspace_id !== $workspace->id) {
+                abort(404, 'Employee not found');
+            }
+        } else {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$employeeParam);
+        }
         
         // Soft delete (photo file is kept for potential restore)
         $employee->delete();
 
         return redirect()
-            ->route('employees.index')
+            ->route('workspace.employees.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil dihapus (dapat dipulihkan)');
     }
 
@@ -280,7 +562,12 @@ class EmployeeController extends Controller
      */
     protected function getFilteredEmployeesQuery(Request $request)
     {
-        $query = Employee::with('position');
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $query = Employee::where('workspace_id', $workspace->id)->with('position');
 
         // Search by name
         if ($request->filled('search')) {
@@ -369,6 +656,11 @@ class EmployeeController extends Controller
      */
     public function exportExcel(Request $request)
     {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
         $employees = $this->getFilteredEmployeesQuery($request)->get();
         
         $filename = 'data-pegawai-' . date('Y-m-d-His') . '.xlsx';
@@ -379,16 +671,38 @@ class EmployeeController extends Controller
     /**
      * Restore a soft-deleted employee
      *
+     * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function restore($id)
+    public function restore(Request $request, $employee)
     {
-        $employee = Employee::withTrashed()->findOrFail($id);
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $employeeParam = $routeParams['employee'] ?? $employee;
+        
+        // If it's already an Employee model instance, use it; otherwise find by ID
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+            // Verify workspace access
+            if ($employee->workspace_id !== $workspace->id) {
+                abort(404, 'Employee not found');
+            }
+            $employee = $employee->withTrashed()->first();
+        } else {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->withTrashed()
+                ->findOrFail((int)$employeeParam);
+        }
         $employee->restore();
 
         return redirect()
-            ->route('employees.index')
+            ->route('workspace.employees.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil dipulihkan');
     }
 }

@@ -18,6 +18,13 @@ class PositionSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
 
+        // Get or create demo workspace
+        $workspace = \App\Models\Workspace::where('slug', 'demo-workspace')->first();
+        if (!$workspace) {
+            $this->command->warn('Demo workspace not found. Please run UserSeeder first.');
+            return;
+        }
+
         $positions = [
             'Direktur',
             'Manajer',
@@ -30,12 +37,19 @@ class PositionSeeder extends Seeder
         ];
 
         foreach ($positions as $position) {
-            DB::table('positions')->insert([
-                'name' => $position,
-                'description' => $faker->sentence(6),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            \App\Models\Position::firstOrCreate(
+                [
+                    'name' => $position,
+                    'workspace_id' => $workspace->id,
+                ],
+                [
+                    'name' => $position,
+                    'description' => $faker->sentence(6),
+                    'workspace_id' => $workspace->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
         }
     }
 }
