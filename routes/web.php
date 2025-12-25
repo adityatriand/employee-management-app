@@ -6,6 +6,8 @@ use App\Http\Controllers\PositionController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Auth;
 
 // Landing page
@@ -26,6 +28,12 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('positions', [PositionController::class, 'index'])->name('positions.index');
     Route::get('files', [FileController::class, 'index'])->name('files.index');
     Route::get('files/{file}/download', [FileController::class, 'download'])->name('files.download');
+    Route::get('assets', [AssetController::class, 'index'])->name('assets.index');
+
+    // Storage streaming routes (for MinIO files)
+    Route::get('storage/files/{file}', [StorageController::class, 'streamFile'])->name('storage.files');
+    Route::get('storage/assets/{asset}/image', [StorageController::class, 'streamAssetImage'])->name('storage.assets.image');
+    Route::get('storage/employees/{employee}/photo', [StorageController::class, 'streamEmployeePhoto'])->name('storage.employees.photo');
 
     // Admin only routes (create, edit, delete) - MUST be before parameterized routes
     Route::middleware('checkLevel')->group(function () {
@@ -58,11 +66,22 @@ Route::group(['middleware' => 'auth'], function () {
         Route::put('files/{file}', [FileController::class, 'update'])->name('files.update');
         Route::delete('files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
         Route::post('files/{file}/restore', [FileController::class, 'restore'])->name('files.restore');
+
+        // Asset management (admin only) - specific routes first
+        Route::get('assets/create', [AssetController::class, 'create'])->name('assets.create');
+        Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
+        Route::get('assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
+        Route::put('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+        Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+        Route::post('assets/{asset}/restore', [AssetController::class, 'restore'])->name('assets.restore');
+        Route::post('assets/{asset}/assign', [AssetController::class, 'assign'])->name('assets.assign');
+        Route::post('assets/{asset}/unassign', [AssetController::class, 'unassign'])->name('assets.unassign');
     });
 
     // Parameterized routes (show) - must be after specific routes
     Route::get('employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
     Route::get('positions/{position}', [PositionController::class, 'show'])->name('positions.show');
     Route::get('files/{file}', [FileController::class, 'show'])->name('files.show');
+    Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
 });
 

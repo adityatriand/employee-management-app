@@ -44,6 +44,22 @@ class Employee extends Model
     }
 
     /**
+     * Get all assets currently assigned to the employee.
+     */
+    public function assets()
+    {
+        return $this->hasMany(Asset::class, 'assigned_to', 'id');
+    }
+
+    /**
+     * Get all asset assignment history for the employee.
+     */
+    public function assetAssignments()
+    {
+        return $this->hasMany(AssetAssignment::class, 'employee_id', 'id');
+    }
+
+    /**
      * Get employee photo file
      */
     public function photoFile()
@@ -54,7 +70,7 @@ class Employee extends Model
     }
 
     /**
-     * Get the photo URL (from MinIO or fallback to local)
+     * Get the photo URL (from MinIO via Laravel streaming endpoint or fallback to local)
      */
     public function getPhotoUrlAttribute()
     {

@@ -170,12 +170,30 @@ class FileController extends Controller
         $file = File::findOrFail($id);
 
         try {
-            $fileContent = Storage::disk('minio')->get($file->file_path);
+            $disk = Storage::disk('minio');
             
-            return response($fileContent, 200)
-                ->header('Content-Type', $file->mime_type)
-                ->header('Content-Disposition', 'attachment; filename="' . $file->name . '"');
+            if (!$disk->exists($file->file_path)) {
+                return redirect()->back()
+                    ->with('error', 'File tidak ditemukan');
+            }
+
+            $mimeType = $file->mime_type ?: 'application/octet-stream';
+            $fileSize = $disk->size($file->file_path);
+
+            // Use streaming for better memory efficiency
+            return response()->stream(function() use ($disk, $file) {
+                $stream = $disk->readStream($file->file_path);
+                if ($stream) {
+                    fpassthru($stream);
+                    fclose($stream);
+                }
+            }, 200, [
+                'Content-Type' => $mimeType,
+                'Content-Disposition' => 'attachment; filename="' . $file->name . '"',
+                'Content-Length' => $fileSize,
+            ]);
         } catch (\Exception $e) {
+            \Log::error('File download error: ' . $e->getMessage());
             return redirect()->back()
                 ->with('error', 'File tidak ditemukan atau tidak dapat diakses');
         }

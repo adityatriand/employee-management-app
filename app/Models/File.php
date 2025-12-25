@@ -46,14 +46,20 @@ class File extends Model
     }
 
     /**
-     * Get the file URL from MinIO
+     * Get the file URL from MinIO via Laravel streaming endpoint
      */
     public function getUrlAttribute()
     {
         try {
-            return Storage::disk('minio')->url($this->file_path);
+            $disk = Storage::disk('minio');
+            if ($disk->exists($this->file_path)) {
+                // Use Laravel route to stream file instead of direct MinIO URL
+                return route('storage.files', $this->id);
+            }
+            return '#';
         } catch (\Exception $e) {
             // Fallback if MinIO is not configured
+            \Log::warning('File URL generation failed: ' . $e->getMessage());
             return '#';
         }
     }
