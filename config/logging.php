@@ -63,6 +63,17 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
         ],
 
+        'json' => [
+            'driver' => 'monolog',
+            'handler' => StreamHandler::class,
+            'with' => [
+                'stream' => storage_path('logs/laravel.json'),
+            ],
+            'formatter' => App\Logging\JsonFormatter::class,
+            'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [App\Logging\JsonFormatter::class],
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

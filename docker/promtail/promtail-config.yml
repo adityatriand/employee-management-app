@@ -1,0 +1,77 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Laravel JSON logs
+  - job_name: laravel-json
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: laravel
+          app: employee-management
+          log_type: json
+          __path__: /var/log/laravel/laravel.json
+    pipeline_stages:
+      - json:
+          expressions:
+            message: message
+            context: context
+            level_name: level_name
+            channel: channel
+            datetime: datetime
+      - json:
+          expressions:
+            type: context.type
+            method: context.method
+            url: context.url
+            path: context.path
+            status_code: context.status_code
+            duration_ms: context.duration_ms
+            payload: context.payload
+            query_params: context.query_params
+            exception: context.exception
+            exception_message: context.exception_message
+            timestamp: context.timestamp
+      - labels:
+          level_name:
+          channel:
+          type:
+          method:
+          status_code:
+          path:
+      - timestamp:
+          source: datetime
+          format: RFC3339
+          fallback_formats:
+            - Unix
+            - UnixMs
+            - UnixUs
+            - UnixNs
+
+  # Laravel regular logs (fallback)
+  - job_name: laravel-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: laravel
+          app: employee-management
+          log_type: text
+          __path__: /var/log/laravel/laravel.log
+    pipeline_stages:
+      - regex:
+          expression: '\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (?P<level>\w+)\.(?P<message>.*)'
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05'
+
