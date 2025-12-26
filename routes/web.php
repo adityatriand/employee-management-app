@@ -23,7 +23,8 @@ Route::get('/register', function () {
     return view('auth.register');
 })->middleware('guest')->name('register');
 
-Route::post('/register', [App\Http\Controllers\Auth\RegisterController::class, 'register'])->middleware('guest');
+Route::post('/register', [App\Http\Controllers\Auth\RegisterController::class, 'register'])
+    ->middleware(['guest', 'throttle:register']);
 
 // Workspace setup (after registration, before workspace exists)
 Route::middleware(['auth'])->group(function () {
@@ -36,7 +37,9 @@ Route::prefix('{workspace}')->group(function () {
     // Workspace login routes
     Route::middleware('guest')->group(function () {
         Route::get('/login', [App\Http\Controllers\Auth\LoginController::class, 'showLoginForm'])->name('workspace.login');
-        Route::post('/login', [App\Http\Controllers\Auth\LoginController::class, 'login'])->name('workspace.login.post');
+        Route::post('/login', [App\Http\Controllers\Auth\LoginController::class, 'login'])
+            ->middleware('throttle:login')
+            ->name('workspace.login.post');
     });
 
     // Authenticated workspace routes
@@ -86,6 +89,12 @@ Route::prefix('{workspace}')->group(function () {
             // Export routes (admin only)
             Route::get('/employees/export/pdf', [EmployeeController::class, 'exportPdf'])->name('workspace.employees.export.pdf');
             Route::get('/employees/export/excel', [EmployeeController::class, 'exportExcel'])->name('workspace.employees.export.excel');
+            Route::get('/employees/export/pdf/download', [EmployeeController::class, 'downloadExportPdf'])->name('workspace.employees.export.pdf.download');
+            Route::get('/employees/export/excel/download', [EmployeeController::class, 'downloadExportExcel'])->name('workspace.employees.export.excel.download');
+
+            // Settings (admin only)
+            Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('workspace.settings.index');
+            Route::post('/settings/password', [App\Http\Controllers\SettingsController::class, 'updatePasswordSettings'])->name('workspace.settings.password.update');
 
             // Position routes - specific routes first (before /positions/{position})
             Route::get('/positions/create', [PositionController::class, 'create'])->name('workspace.positions.create');

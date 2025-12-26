@@ -8,6 +8,7 @@ use App\Http\Controllers\PositionController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\MetricsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,8 +22,15 @@ use App\Http\Controllers\Api\AuthController;
 */
 
 // Public routes (no authentication required)
-Route::post('/login', [AuthController::class, 'login'])->name('api.login');
-Route::post('/register', [AuthController::class, 'register'])->name('api.register');
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:login')
+    ->name('api.login');
+Route::post('/register', [AuthController::class, 'register'])
+    ->middleware('throttle:register')
+    ->name('api.register');
+
+// Metrics endpoint for Prometheus (public but can be protected with IP whitelist in production)
+Route::get('/metrics', [MetricsController::class, 'index'])->name('api.metrics');
 
 // Protected API routes (require Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
