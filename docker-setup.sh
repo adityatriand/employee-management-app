@@ -19,12 +19,40 @@ APP_KEY=
 APP_DEBUG=true
 APP_URL=http://localhost:8000
 
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+
+# Database Configuration
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=employee_management
 DB_USERNAME=laravel_user
 DB_PASSWORD=laravel_password
+
+# Redis Configuration (set automatically in Docker via docker-compose.yml)
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=null
+
+# Cache & Queue (auto-detects Redis if REDIS_HOST is set)
+CACHE_DRIVER=redis
+QUEUE_CONNECTION=redis
+
+# Session Configuration
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+
+# Sanctum Token Configuration
+SANCTUM_TOKEN_EXPIRATION=1440
+
+# MinIO Configuration (set automatically in Docker via docker-compose.yml)
+MINIO_ENDPOINT=http://minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin123
+MINIO_BUCKET=workforcehub
+MINIO_REGION=us-east-1
+MINIO_URL=http://localhost:9000
 EOF
     fi
     echo "✅ .env file created"
@@ -85,6 +113,14 @@ docker-compose exec -T app npm run production || {
 echo "🔐 Setting storage permissions..."
 docker-compose exec -T app chmod -R 775 storage bootstrap/cache
 
+# Ensure monitoring directories exist
+echo "📊 Setting up monitoring directories..."
+mkdir -p docker/prometheus/rules
+mkdir -p docker/grafana/provisioning/datasources
+mkdir -p docker/grafana/provisioning/dashboards
+mkdir -p docker/grafana/dashboards
+echo "✅ Monitoring directories ready"
+
 # Setup MinIO
 echo "📦 Setting up MinIO..."
 if docker-compose ps minio 2>/dev/null | grep -q "Up"; then
@@ -135,6 +171,58 @@ else
     echo "   Then create bucket manually via MinIO Console: http://localhost:9001"
 fi
 
+# Wait for monitoring services to be ready
+echo "📊 Waiting for monitoring services to start..."
+sleep 10
+
+# Check if curl is available
+if command -v curl > /dev/null 2>&1; then
+    # Check Prometheus
+    echo "   Checking Prometheus..."
+    for i in {1..30}; do
+        if curl -sf http://localhost:9090/-/healthy > /dev/null 2>&1; then
+            echo "✅ Prometheus is ready!"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "⚠️  Prometheus did not become ready in time (check manually at http://localhost:9090)"
+        fi
+        sleep 1
+    done
+
+    # Check Grafana
+    echo "   Checking Grafana..."
+    for i in {1..30}; do
+        if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+            echo "✅ Grafana is ready!"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "⚠️  Grafana did not become ready in time (check manually at http://localhost:3000)"
+        fi
+        sleep 1
+    done
+
+    # Verify metrics endpoint
+    echo "   Verifying Laravel metrics endpoint..."
+    for i in {1..20}; do
+        if curl -sf http://localhost:8000/api/metrics > /dev/null 2>&1; then
+            echo "✅ Metrics endpoint is accessible!"
+            break
+        fi
+        if [ $i -eq 20 ]; then
+            echo "⚠️  Metrics endpoint not ready yet (may need app restart)"
+        fi
+        sleep 1
+    done
+else
+    echo "⚠️  curl not found, skipping health checks"
+    echo "   Please verify monitoring services manually:"
+    echo "   - Prometheus: http://localhost:9090"
+    echo "   - Grafana: http://localhost:3000"
+    echo "   - Metrics: http://localhost:8000/api/metrics"
+fi
+
 echo ""
 echo "✅ Setup complete!"
 echo ""
@@ -144,11 +232,20 @@ echo "📦 MinIO Console: http://localhost:9001"
 echo "   Username: minioadmin"
 echo "   Password: minioadmin123"
 echo ""
+echo "📊 Monitoring Services:"
+echo "   📈 Grafana Dashboard: http://localhost:3000"
+echo "      Username: admin"
+echo "      Password: admin123"
+echo "   📉 Prometheus: http://localhost:9090"
+echo "   📊 Metrics Endpoint: http://localhost:8000/api/metrics"
+echo ""
 echo "Useful commands:"
 echo "  - View logs: docker-compose logs -f"
 echo "  - Stop container: docker-compose down"
 echo "  - Restart container: docker-compose restart"
 echo "  - Execute artisan: docker-compose exec app php artisan <command>"
 echo "  - Access MySQL: docker-compose exec app mysql -u laravel_user -p employee_management"
+echo ""
+echo "📖 For monitoring documentation, see: docker/MONITORING.md"
 echo ""
 

@@ -185,6 +185,37 @@ If you encounter network timeout errors when building the image:
 5. **Try building during off-peak hours** (Docker Hub can be slow)
 6. **Use a different Docker registry mirror** (if available in your region)
 
+## 📊 Monitoring
+
+The application includes Prometheus and Grafana for comprehensive monitoring and observability.
+
+### Access Monitoring Services
+
+- **Grafana Dashboard**: http://localhost:3000
+  - Username: `admin`
+  - Password: `admin123`
+- **Prometheus**: http://localhost:9090
+- **Metrics Endpoint**: http://localhost:8000/api/metrics
+
+### Features
+
+- **Real-time Metrics**: HTTP requests, database queries, memory usage, cache performance
+- **Application Statistics**: Employee counts, user counts, workspace metrics
+- **Performance Monitoring**: Request duration, database connections, queue status
+- **Pre-configured Dashboards**: Laravel application metrics dashboard included
+
+### Starting Monitoring Services
+
+Monitoring services are automatically started with `docker-compose up -d`. They include:
+
+- **Prometheus**: Metrics collection and storage (30-day retention)
+- **Grafana**: Visualization and dashboards
+- **Laravel Metrics Endpoint**: Exposes application metrics in Prometheus format
+
+### Documentation
+
+For detailed monitoring setup and configuration, see [docker/MONITORING.md](docker/MONITORING.md).
+
 ### Running without Docker
 
 1. **Install PHP dependencies**:
