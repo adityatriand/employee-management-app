@@ -26,6 +26,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 
+# Install Redis extension (phpredis) - optional but recommended for better performance
+# If this fails, Predis (pure PHP) will be used instead
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get purge -y $PHPIZE_DEPS \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* || \
+    echo "Redis extension installation failed, will use Predis instead"
+
 # Install Composer (with retry logic)
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer || \
     (sleep 5 && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer)

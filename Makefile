@@ -1,4 +1,4 @@
-.PHONY: help up down build rebuild restart logs shell composer npm artisan migrate fresh seed install clean crop-logo npm-watch npm-watch-poll npm-watch-bg
+.PHONY: help up down build rebuild restart logs shell composer npm artisan migrate fresh seed install clean crop-logo npm-watch npm-watch-poll npm-watch-bg composer-dump apply-changes setup-queue queue-work-bg
 
 # Default target
 .DEFAULT_GOAL := help
@@ -275,4 +275,32 @@ queue-work: ## Start queue worker
 queue-listen: ## Start queue listener
 	@echo "$(GREEN)Starting queue listener...$(RESET)"
 	docker-compose exec app php artisan queue:listen
+
+queue-work-bg: ## Start queue worker in background (detached)
+	@echo "$(GREEN)Starting queue worker in background...$(RESET)"
+	@docker-compose exec -d app php artisan queue:work --daemon || \
+		(docker-compose exec -d app sh -c "php artisan queue:work &")
+	@echo "$(GREEN)Queue worker started in background$(RESET)"
+	@echo "$(YELLOW)Check logs with: make logs$(RESET)"
+
+composer-dump: ## Dump composer autoload (after adding new classes)
+	@echo "$(GREEN)Dumping composer autoload...$(RESET)"
+	docker-compose exec -T app composer dump-autoload
+
+apply-changes: ## Apply all recent changes (migrations, autoload, cache clear)
+	@echo "$(GREEN)Applying all changes...$(RESET)"
+	@echo "$(YELLOW)1. Updating composer autoload...$(RESET)"
+	@make composer-dump || true
+	@echo "$(YELLOW)2. Running database migrations...$(RESET)"
+	@make migrate || true
+	@echo "$(YELLOW)3. Clearing all caches...$(RESET)"
+	@make cache-clear || true
+	@echo "$(GREEN)✅ All changes applied!$(RESET)"
+	@echo "$(YELLOW)Note: Start queue worker with 'make queue-work' for background jobs$(RESET)"
+
+setup-queue: ## Setup queue tables (for database queue driver)
+	@echo "$(GREEN)Setting up queue tables...$(RESET)"
+	@docker-compose exec -T app php artisan queue:table || true
+	@make migrate || true
+	@echo "$(GREEN)Queue tables ready!$(RESET)"
 

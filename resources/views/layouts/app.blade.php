@@ -97,6 +97,12 @@
                 </a>
             </div>
             <div class="nav-item">
+                <a class="nav-link {{ request()->routeIs('workspace.settings.index') ? 'active' : '' }}" href="{{ route('workspace.settings.index', $routeParams) }}">
+                    <i class="oi oi-cog"></i>
+                    <span>Pengaturan Password</span>
+                </a>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link {{ request()->routeIs('workspace.activity-logs.*') ? 'active' : '' }}" href="{{ route('workspace.activity-logs.index', $routeParams) }}">
                     <i class="oi oi-clock"></i>
                     <span>Riwayat Aktivitas</span>
