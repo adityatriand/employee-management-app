@@ -114,11 +114,33 @@
                                id="email"
                                name="email"
                                value="{{ old('email') }}"
-                               placeholder="email@example.com">
-                        <small class="text-muted">Jika diisi, akan dibuat akun pengguna untuk pegawai ini (password default: password123)</small>
+                               placeholder="email@example.com"
+                               onchange="togglePasswordField()">
+                        <small class="text-muted">Jika diisi, akan dibuat akun pengguna untuk pegawai ini</small>
                         @error('email')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-4" id="passwordFieldContainer" style="display: none;">
+                        <label for="password" class="form-label fw-bold">Password (Opsional)</label>
+                        <input type="text"
+                               class="form-control @error('password') is-invalid @enderror"
+                               id="password"
+                               name="password"
+                               value="{{ old('password') }}"
+                               placeholder="Kosongkan untuk auto-generate">
+                        <small class="text-muted">
+                            Kosongkan untuk menggunakan password default (dari Settings) atau auto-generate. 
+                            Atau set password custom yang memenuhi persyaratan: {{ $passwordDescription ?? 'Minimal 8 karakter dengan huruf, angka, dan simbol' }}
+                        </small>
+                        @error('password')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        @if(session('password_error'))
+                        <div class="text-danger small mt-1">{{ session('password_error') }}</div>
+                        @endif
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -170,7 +192,21 @@
 
 @push('scripts')
 <script>
+function togglePasswordField() {
+    const emailField = document.getElementById('email');
+    const passwordContainer = document.getElementById('passwordFieldContainer');
+    
+    if (emailField.value.trim() !== '') {
+        passwordContainer.style.display = 'block';
+    } else {
+        passwordContainer.style.display = 'none';
+        document.getElementById('password').value = '';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize password field visibility
+    togglePasswordField();
     const fileInput = document.getElementById('photo');
     const fileUploadBox = document.getElementById('fileUploadBox');
     const uploadContent = document.querySelector('.file-upload-content');

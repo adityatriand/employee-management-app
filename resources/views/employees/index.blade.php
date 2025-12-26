@@ -1,6 +1,55 @@
 @extends('layouts.app')
 
 @section('content')
+@if(session('generated_password'))
+<!-- Password Modal -->
+<div class="modal fade show" id="passwordModal" tabindex="-1" style="display: block;" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">
+                    <i class="oi oi-key"></i> Password Akun Baru
+                </h5>
+                <button type="button" class="btn-close" onclick="closePasswordModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong>Akun pengguna telah dibuat!</strong><br>
+                    Email: <strong>{{ session('user_email') }}</strong>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Password yang Digenerate:</label>
+                    <div class="input-group">
+                        <input type="text" 
+                               class="form-control font-monospace" 
+                               id="generatedPassword" 
+                               value="{{ session('generated_password') }}" 
+                               readonly>
+                        <button class="btn btn-outline-secondary" 
+                                type="button" 
+                                onclick="copyPassword()"
+                                title="Copy password">
+                            <i class="oi oi-clipboard"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="oi oi-warning"></i> 
+                    <strong>Penting!</strong> Simpan password ini dan berikan kepada pegawai. 
+                    Password ini tidak akan ditampilkan lagi setelah modal ini ditutup.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closePasswordModal()">
+                    <i class="oi oi-check"></i> Saya Sudah Mencatat Password
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show" id="modalBackdrop"></div>
+@endif
+
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center">
         <h1 class="page-title">Data Pegawai</h1>
@@ -335,6 +384,31 @@
 
 @push('scripts')
 <script>
+function closePasswordModal() {
+    document.getElementById('passwordModal').style.display = 'none';
+    document.getElementById('modalBackdrop').style.display = 'none';
+}
+
+function copyPassword() {
+    const passwordInput = document.getElementById('generatedPassword');
+    passwordInput.select();
+    passwordInput.setSelectionRange(0, 99999); // For mobile devices
+    document.execCommand('copy');
+    
+    // Show feedback
+    const button = event.target.closest('button');
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<i class="oi oi-check"></i> Copied!';
+    button.classList.add('btn-success');
+    button.classList.remove('btn-outline-secondary');
+    
+    setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.classList.remove('btn-success');
+        button.classList.add('btn-outline-secondary');
+    }, 2000);
+}
+
 function toggleFilters() {
     const panel = document.getElementById('filterPanel');
     if (panel.style.display === 'none') {

@@ -5,8 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Exports\EmployeesExport;
+use App\Jobs\ExportEmployeesPdf;
+use App\Jobs\ExportEmployeesExcel;
+use App\Helpers\PasswordHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -65,10 +69,12 @@ class EmployeeController extends Controller
             ->paginate(10)
             ->appends($request->query());
 
-        // Get positions for filter dropdown (scoped to workspace)
-        $positions = Position::where('workspace_id', $workspace->id)
-            ->orderBy('name', 'asc')
-            ->get();
+        // Get positions for filter dropdown (scoped to workspace) - cached
+        $positions = Cache::remember("positions_{$workspace->id}", 3600, function () use ($workspace) {
+            return Position::where('workspace_id', $workspace->id)
+                ->orderBy('name', 'asc')
+                ->get();
+        });
         
         // Calculate filter status
         $hasFilters = $request->filled('search') ||
@@ -101,8 +107,14 @@ class EmployeeController extends Controller
             abort(404, 'Workspace not found');
         }
 
-        $positions = Position::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
-        return view('employees.create', compact('positions', 'workspace'));
+        $positions = Cache::remember("positions_{$workspace->id}", 3600, function () use ($workspace) {
+            return Position::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
+        });
+        
+        // Get password requirements for display
+        $passwordDescription = \App\Helpers\PasswordHelper::getPasswordDescription($workspace->id);
+        
+        return view('employees.create', compact('positions', 'workspace', 'passwordDescription'));
     }
 
     /**
@@ -121,6 +133,7 @@ class EmployeeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|unique:users,email',
+            'password' => 'nullable|string|min:6',
             'gender' => 'required|in:L,P',
             'birth_date' => 'required|date',
             'position_id' => 'required|exists:positions,id',
@@ -130,6 +143,7 @@ class EmployeeController extends Controller
             'name.required' => 'Nama pegawai tidak boleh kosong',
             'email.email' => 'Format email tidak valid',
             'email.unique' => 'Email sudah terdaftar',
+            'password.min' => 'Password minimal 6 karakter',
             'gender.required' => 'Jenis kelamin tidak boleh kosong',
             'birth_date.required' => 'Tanggal lahir tidak boleh kosong',
             'position_id.required' => 'Jabatan harus diisi',
@@ -151,11 +165,43 @@ class EmployeeController extends Controller
 
         // Create user account if email is provided
         $user = null;
+        $generatedPassword = null;
         if ($request->filled('email')) {
+            // Determine password to use
+            $password = null;
+            if ($request->filled('password')) {
+                // Admin provided custom password - validate it meets requirements
+                $passwordRule = \App\Helpers\PasswordHelper::getPasswordRule($workspace->id);
+                $validator = \Illuminate\Support\Facades\Validator::make(
+                    ['password' => $request->password],
+                    ['password' => ['required', $passwordRule]]
+                );
+                
+                if ($validator->fails()) {
+                    return back()
+                        ->withErrors($validator)
+                        ->withInput()
+                        ->with('password_error', 'Password tidak memenuhi persyaratan. ' . \App\Helpers\PasswordHelper::getPasswordDescription($workspace->id));
+                }
+                
+                $password = $request->password;
+            } else {
+                // Use default password from settings or generate one
+                $defaultPassword = \App\Models\Setting::get('employee_default_password', '', $workspace->id);
+                
+                if (!empty($defaultPassword)) {
+                    $password = $defaultPassword;
+                } else {
+                    // Generate password that meets requirements
+                    $password = \App\Helpers\PasswordHelper::generatePassword($workspace->id);
+                    $generatedPassword = $password; // Store to show to admin
+                }
+            }
+            
             $user = \App\Models\User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
-                'password' => \Illuminate\Support\Facades\Hash::make('password123'), // Default password, should be changed on first login
+                'password' => \Illuminate\Support\Facades\Hash::make($password),
                 'level' => 0, // Regular user
                 'workspace_id' => $workspace->id,
             ]);
@@ -206,8 +252,19 @@ class EmployeeController extends Controller
         
         $workspaceSlug = $workspace->slug;
         $message = 'Data berhasil ditambahkan';
+        
         if ($user) {
-            $message .= '. Akun pengguna telah dibuat dengan email: ' . $user->email . ' (password default: password123)';
+            if ($generatedPassword) {
+                // Show generated password to admin
+                $message .= '. Akun pengguna telah dibuat dengan email: ' . $user->email;
+                return redirect()
+                    ->route('workspace.employees.index', ['workspace' => $workspaceSlug])
+                    ->with('success', $message)
+                    ->with('generated_password', $generatedPassword)
+                    ->with('user_email', $user->email);
+            } else {
+                $message .= '. Akun pengguna telah dibuat dengan email: ' . $user->email . ' (password sesuai yang Anda set)';
+            }
         }
         
         return redirect()
@@ -609,50 +666,85 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Export employees to PDF
+     * Export employees to PDF (background job)
      *
      * @param Request $request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function exportPdf(Request $request)
     {
-        $employees = $this->getFilteredEmployeesQuery($request)->get();
-        
-        // Get filter information for PDF header
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Prepare filters
         $filters = [];
         if ($request->filled('search')) {
             $filters['search'] = $request->search;
         }
         if ($request->filled('position_id')) {
-            $position = Position::find($request->position_id);
-            $filters['position'] = $position ? $position->name : '-';
+            $filters['position_id'] = $request->position_id;
         }
         if ($request->filled('gender')) {
-            $filters['gender'] = $request->gender == 'L' ? 'Laki-Laki' : 'Perempuan';
+            $filters['gender'] = $request->gender;
         }
-        if ($request->filled('birth_date_from') || $request->filled('birth_date_to')) {
-            $filters['birth_date'] = ($request->birth_date_from ?? '-') . ' s/d ' . ($request->birth_date_to ?? '-');
+        if ($request->filled('birth_date_from')) {
+            $filters['birth_date_from'] = $request->birth_date_from;
         }
-        if ($request->filled('created_from') || $request->filled('created_to')) {
-            $filters['created_date'] = ($request->created_from ?? '-') . ' s/d ' . ($request->created_to ?? '-');
+        if ($request->filled('birth_date_to')) {
+            $filters['birth_date_to'] = $request->birth_date_to;
+        }
+        if ($request->filled('created_from')) {
+            $filters['created_from'] = $request->created_from;
+        }
+        if ($request->filled('created_to')) {
+            $filters['created_to'] = $request->created_to;
         }
 
-        $pdf = Pdf::loadView('employees.export-pdf', [
-            'employees' => $employees,
-            'filters' => $filters,
-            'total' => $employees->count(),
-        ]);
+        // Dispatch job
+        ExportEmployeesPdf::dispatch($workspace->id, $filters, auth()->id());
 
-        $filename = 'data-pegawai-' . date('Y-m-d-His') . '.pdf';
-        
-        return $pdf->download($filename);
+        return redirect()
+            ->route('workspace.employees.index', ['workspace' => $workspace->slug])
+            ->with('success', 'Export PDF sedang diproses. File akan tersedia untuk diunduh dalam beberapa saat.');
     }
 
     /**
-     * Export employees to Excel
+     * Download exported PDF
      *
      * @param Request $request
      * @return \Illuminate\Http\Response
+     */
+    public function downloadExportPdf(Request $request)
+    {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $cacheKey = "export_pdf_{$request->user()->id}_{$workspace->id}";
+        $exportInfo = Cache::get($cacheKey);
+
+        if (!$exportInfo || !Storage::disk('local')->exists($exportInfo['filename'])) {
+            return redirect()
+                ->route('workspace.employees.index', ['workspace' => $workspace->slug])
+                ->with('error', 'File export tidak ditemukan atau sudah kedaluwarsa.');
+        }
+
+        $filePath = storage_path('app/' . $exportInfo['filename']);
+        
+        // Delete from cache after download
+        Cache::forget($cacheKey);
+
+        return response()->download($filePath, $exportInfo['original_name'])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Export employees to Excel (background job)
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function exportExcel(Request $request)
     {
@@ -661,11 +753,66 @@ class EmployeeController extends Controller
             abort(404, 'Workspace not found');
         }
 
-        $employees = $this->getFilteredEmployeesQuery($request)->get();
+        // Prepare filters
+        $filters = [];
+        if ($request->filled('search')) {
+            $filters['search'] = $request->search;
+        }
+        if ($request->filled('position_id')) {
+            $filters['position_id'] = $request->position_id;
+        }
+        if ($request->filled('gender')) {
+            $filters['gender'] = $request->gender;
+        }
+        if ($request->filled('birth_date_from')) {
+            $filters['birth_date_from'] = $request->birth_date_from;
+        }
+        if ($request->filled('birth_date_to')) {
+            $filters['birth_date_to'] = $request->birth_date_to;
+        }
+        if ($request->filled('created_from')) {
+            $filters['created_from'] = $request->created_from;
+        }
+        if ($request->filled('created_to')) {
+            $filters['created_to'] = $request->created_to;
+        }
+
+        // Dispatch job
+        ExportEmployeesExcel::dispatch($workspace->id, $filters, auth()->id());
+
+        return redirect()
+            ->route('workspace.employees.index', ['workspace' => $workspace->slug])
+            ->with('success', 'Export Excel sedang diproses. File akan tersedia untuk diunduh dalam beberapa saat.');
+    }
+
+    /**
+     * Download exported Excel
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function downloadExportExcel(Request $request)
+    {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        $cacheKey = "export_excel_{$request->user()->id}_{$workspace->id}";
+        $exportInfo = Cache::get($cacheKey);
+
+        if (!$exportInfo || !Storage::disk('local')->exists($exportInfo['filename'])) {
+            return redirect()
+                ->route('workspace.employees.index', ['workspace' => $workspace->slug])
+                ->with('error', 'File export tidak ditemukan atau sudah kedaluwarsa.');
+        }
+
+        $filePath = storage_path('app/' . $exportInfo['filename']);
         
-        $filename = 'data-pegawai-' . date('Y-m-d-His') . '.xlsx';
-        
-        return Excel::download(new EmployeesExport($employees), $filename);
+        // Delete from cache after download
+        Cache::forget($cacheKey);
+
+        return response()->download($filePath, $exportInfo['original_name'])->deleteFileAfterSend(true);
     }
 
     /**
