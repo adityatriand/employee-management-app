@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Position;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class HomeController extends Controller
@@ -80,49 +81,70 @@ class HomeController extends Controller
      */
     protected function getStatistics($workspace)
     {
-        $totalEmployees = Employee::where('workspace_id', $workspace->id)->count();
-        $totalPositions = Position::where('workspace_id', $workspace->id)->count();
-        $maleEmployees = Employee::where('workspace_id', $workspace->id)->where('gender', 'L')->count();
-        $femaleEmployees = Employee::where('workspace_id', $workspace->id)->where('gender', 'P')->count();
-        
-        // Calculate average age
-        $averageAge = Employee::where('workspace_id', $workspace->id)
-            ->selectRaw('AVG(YEAR(CURDATE()) - YEAR(birth_date)) as avg_age')
-            ->value('avg_age');
-        $averageAge = $averageAge ? round($averageAge, 1) : 0;
-        
-        // Calculate employees added this month
-        $now = Carbon::now();
-        $employeesThisMonth = Employee::where('workspace_id', $workspace->id)
-            ->whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
-            ->count();
-        
-        // Calculate employees added last month
-        $lastMonth = Carbon::now()->subMonth();
-        $employeesLastMonth = Employee::where('workspace_id', $workspace->id)
-            ->whereMonth('created_at', $lastMonth->month)
-            ->whereYear('created_at', $lastMonth->year)
-            ->count();
-        
-        // Calculate trend (percentage change)
-        $trend = 0;
-        if ($employeesLastMonth > 0) {
-            $trend = (($employeesThisMonth - $employeesLastMonth) / $employeesLastMonth) * 100;
-        } elseif ($employeesThisMonth > 0 && $employeesLastMonth == 0) {
-            $trend = 100; // 100% increase from 0
-        }
-        
-        return [
-            'total_employees' => $totalEmployees,
-            'total_positions' => $totalPositions,
-            'male_employees' => $maleEmployees,
-            'female_employees' => $femaleEmployees,
-            'average_age' => $averageAge,
-            'employees_this_month' => $employeesThisMonth,
-            'employees_last_month' => $employeesLastMonth,
-            'trend' => round($trend, 1),
-        ];
+        // Cache statistics for 5 minutes
+        return \Illuminate\Support\Facades\Cache::remember("dashboard_stats_{$workspace->id}", 300, function () use ($workspace) {
+            $now = Carbon::now();
+            $lastMonth = $now->copy()->subMonth();
+            
+            // Single query to get all employee counts
+            $employeeStats = Employee::where('workspace_id', $workspace->id)
+                ->selectRaw('
+                    COUNT(*) as total,
+                    SUM(CASE WHEN gender = "L" THEN 1 ELSE 0 END) as male,
+                    SUM(CASE WHEN gender = "P" THEN 1 ELSE 0 END) as female,
+                    SUM(CASE WHEN MONTH(created_at) = ? AND YEAR(created_at) = ? THEN 1 ELSE 0 END) as this_month,
+                    SUM(CASE WHEN MONTH(created_at) = ? AND YEAR(created_at) = ? THEN 1 ELSE 0 END) as last_month
+                ', [
+                    $now->month, $now->year,
+                    $lastMonth->month, $lastMonth->year
+                ])
+                ->first();
+            
+            $totalEmployees = $employeeStats->total ?? 0;
+            $maleEmployees = $employeeStats->male ?? 0;
+            $femaleEmployees = $employeeStats->female ?? 0;
+            $employeesThisMonth = $employeeStats->this_month ?? 0;
+            $employeesLastMonth = $employeeStats->last_month ?? 0;
+            
+            // Calculate average age (cached separately)
+            $averageAge = \Illuminate\Support\Facades\Cache::remember("avg_age_{$workspace->id}", 3600, function () use ($workspace, $now) {
+                $employees = Employee::where('workspace_id', $workspace->id)
+                    ->select('birth_date')
+                    ->get();
+                
+                if ($employees->count() > 0) {
+                    $totalAge = $employees->sum(function ($employee) use ($now) {
+                        return $employee->birth_date ? $now->diffInYears($employee->birth_date) : 0;
+                    });
+                    return round($totalAge / $employees->count(), 1);
+                }
+                return 0;
+            });
+            
+            // Get positions count (cached)
+            $totalPositions = \Illuminate\Support\Facades\Cache::remember("positions_count_{$workspace->id}", 3600, function () use ($workspace) {
+                return Position::where('workspace_id', $workspace->id)->count();
+            });
+            
+            // Calculate trend
+            $trend = 0;
+            if ($employeesLastMonth > 0) {
+                $trend = (($employeesThisMonth - $employeesLastMonth) / $employeesLastMonth) * 100;
+            } elseif ($employeesThisMonth > 0 && $employeesLastMonth == 0) {
+                $trend = 100;
+            }
+            
+            return [
+                'total_employees' => $totalEmployees,
+                'total_positions' => $totalPositions,
+                'male_employees' => $maleEmployees,
+                'female_employees' => $femaleEmployees,
+                'average_age' => $averageAge,
+                'employees_this_month' => $employeesThisMonth,
+                'employees_last_month' => $employeesLastMonth,
+                'trend' => round($trend, 1),
+            ];
+        });
     }
 
     /**
@@ -164,18 +186,28 @@ class HomeController extends Controller
             Employee::where('workspace_id', $workspace->id)->where('gender', 'P')->count(),
         ];
         
-        // Age distribution (by age groups)
+        // Age distribution (by age groups) - using safe date calculations
+        $now = Carbon::now();
         $ageGroups = [
             '18-25' => Employee::where('workspace_id', $workspace->id)
-                ->whereRaw('YEAR(CURDATE()) - YEAR(birth_date) BETWEEN 18 AND 25')->count(),
+                ->whereDate('birth_date', '<=', $now->copy()->subYears(18))
+                ->whereDate('birth_date', '>=', $now->copy()->subYears(25))
+                ->count(),
             '26-35' => Employee::where('workspace_id', $workspace->id)
-                ->whereRaw('YEAR(CURDATE()) - YEAR(birth_date) BETWEEN 26 AND 35')->count(),
+                ->whereDate('birth_date', '<=', $now->copy()->subYears(26))
+                ->whereDate('birth_date', '>=', $now->copy()->subYears(35))
+                ->count(),
             '36-45' => Employee::where('workspace_id', $workspace->id)
-                ->whereRaw('YEAR(CURDATE()) - YEAR(birth_date) BETWEEN 36 AND 45')->count(),
+                ->whereDate('birth_date', '<=', $now->copy()->subYears(36))
+                ->whereDate('birth_date', '>=', $now->copy()->subYears(45))
+                ->count(),
             '46-55' => Employee::where('workspace_id', $workspace->id)
-                ->whereRaw('YEAR(CURDATE()) - YEAR(birth_date) BETWEEN 46 AND 55')->count(),
+                ->whereDate('birth_date', '<=', $now->copy()->subYears(46))
+                ->whereDate('birth_date', '>=', $now->copy()->subYears(55))
+                ->count(),
             '56+' => Employee::where('workspace_id', $workspace->id)
-                ->whereRaw('YEAR(CURDATE()) - YEAR(birth_date) >= 56')->count(),
+                ->whereDate('birth_date', '<=', $now->copy()->subYears(56))
+                ->count(),
         ];
         
         return [
