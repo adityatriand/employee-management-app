@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
+use App\Helpers\PasswordHelper;
 use App\Models\ActivityLog;
 
 class PasswordController extends Controller
@@ -41,15 +41,15 @@ class PasswordController extends Controller
     public function update(Request $request)
     {
         $workspace = $request->get('workspace');
+        $workspaceId = $workspace ? $workspace->id : null;
         
         $validated = $request->validate([
             'current_password' => ['required', 'string'],
-            'password' => ['required', 'string', 'confirmed', Password::min(8)],
+            'password' => ['required', 'string', 'confirmed', PasswordHelper::getPasswordRule($workspaceId)],
         ], [
             'current_password.required' => 'Password saat ini harus diisi',
             'password.required' => 'Password baru harus diisi',
             'password.confirmed' => 'Konfirmasi password tidak cocok',
-            'password.min' => 'Password minimal 8 karakter',
         ]);
 
         $user = Auth::user();

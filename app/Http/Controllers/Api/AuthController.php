@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Helpers\PasswordHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -70,12 +71,14 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'confirmed', PasswordHelper::getPasswordRule()],
             'workspace_name' => ['required', 'string', 'max:255', 'unique:workspaces,name'],
             'workspace_slug' => ['required', 'string', 'max:255', 'unique:workspaces,slug', 'regex:/^[a-z0-9-]+$/'],
             'workspace_logo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
         ], [
             'workspace_slug.regex' => 'Slug hanya boleh berisi huruf kecil, angka, dan tanda hubung.',
+            'password.required' => 'Password harus diisi',
+            'password.confirmed' => 'Konfirmasi password tidak cocok',
         ]);
 
         if ($validator->fails()) {
