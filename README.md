@@ -32,9 +32,15 @@ A Laravel-based multi-tenant employee management system with workspace isolation
 - **MinIO Integration**: Object storage for files, photos, and assets
 - **RESTful API**: Laravel Sanctum-based API with token authentication
 - **Soft Deletes**: Recoverable deletion for all major entities
-- **Export Functionality**: PDF and Excel export for employee data
+- **Export Functionality**: PDF and Excel export for employee data (background jobs)
 - **Responsive UI**: Bootstrap 5 with modern, clean interface
 - **Workspace Branding**: Custom logos and names per workspace
+- **Redis Caching**: Intelligent caching with automatic invalidation
+- **Monitoring & Observability**: Prometheus, Grafana, and Loki integration
+- **Structured Logging**: JSON-formatted logs for better analysis
+- **Security Headers**: HSTS, CSP, and other security headers
+- **Rate Limiting**: Protection against abuse on login/registration
+- **Password Complexity**: Configurable password rules per workspace
 
 ## 📦 Requirements
 
@@ -54,16 +60,29 @@ A Laravel-based multi-tenant employee management system with workspace isolation
 - **Backend**: Laravel 9.52
 - **Frontend**: Bootstrap 5, Laravel Mix, Open Iconic
 - **Database**: MySQL 8.0
+- **Cache**: Redis
 - **Storage**: MinIO (S3-compatible object storage)
 - **API Authentication**: Laravel Sanctum
 - **PHP**: 8.2
 - **Web Server**: Nginx
+- **Monitoring**: Prometheus, Grafana, Loki, Promtail
+- **Queue**: Laravel Queue (Redis-backed)
 
 ## 🚀 Installation & Setup
 
-### Running with Docker (Recommended - Single Image)
+### Running with Docker (Recommended - Bundled Services)
 
-This setup uses a **single Docker image** that includes PHP, Nginx, and MySQL all in one container, making it simpler to run and deploy.
+This setup uses a **single Docker container** that bundles all services together:
+- **Laravel App** (PHP 8.2-FPM + Nginx)
+- **MySQL** (Database)
+- **Redis** (Cache & Sessions)
+- **MinIO** (Object Storage)
+- **Prometheus** (Metrics Collection)
+- **Grafana** (Monitoring Dashboards)
+- **Loki** (Log Aggregation)
+- **Promtail** (Log Shipper)
+
+All services are managed by Supervisor within the single container, making deployment and management simpler.
 
 #### Quick Setup (Automated)
 
@@ -75,12 +94,13 @@ Run the setup script for automated installation:
 
 This script will:
 - Create `.env` file if it doesn't exist
-- Build the single Docker image
-- Start the container with all services
+- Build the Docker image with all bundled services
+- Start the container with all services (MySQL, Redis, MinIO, Monitoring)
 - Install PHP and Node dependencies
 - Generate application key
 - Run database migrations
 - Build frontend assets
+- Set up MinIO bucket
 - Set proper permissions
 
 #### Manual Setup
@@ -185,16 +205,18 @@ If you encounter network timeout errors when building the image:
 5. **Try building during off-peak hours** (Docker Hub can be slow)
 6. **Use a different Docker registry mirror** (if available in your region)
 
-## 📊 Monitoring
+## 📊 Monitoring & Observability
 
-The application includes Prometheus and Grafana for comprehensive monitoring and observability.
+The application includes comprehensive monitoring with Prometheus, Grafana, and Loki for metrics, dashboards, and log aggregation.
 
 ### Access Monitoring Services
 
 - **Grafana Dashboard**: http://localhost:3000
   - Username: `admin`
   - Password: `admin123`
+  - Pre-configured Laravel application dashboard included
 - **Prometheus**: http://localhost:9090
+- **Loki**: http://localhost:3100 (Log aggregation)
 - **Metrics Endpoint**: http://localhost:8000/api/metrics
 
 ### Features
@@ -202,19 +224,29 @@ The application includes Prometheus and Grafana for comprehensive monitoring and
 - **Real-time Metrics**: HTTP requests, database queries, memory usage, cache performance
 - **Application Statistics**: Employee counts, user counts, workspace metrics
 - **Performance Monitoring**: Request duration, database connections, queue status
-- **Pre-configured Dashboards**: Laravel application metrics dashboard included
+- **Log Aggregation**: Centralized logging with Loki and Promtail
+- **Pre-configured Dashboards**: Laravel application metrics dashboard with API/web request tracking
+- **Structured Logging**: JSON-formatted logs for better querying and analysis
 
-### Starting Monitoring Services
+### Monitoring Services
 
-Monitoring services are automatically started with `docker-compose up -d`. They include:
+All monitoring services are automatically started with `docker-compose up -d` and managed by Supervisor:
 
 - **Prometheus**: Metrics collection and storage (30-day retention)
-- **Grafana**: Visualization and dashboards
+- **Grafana**: Visualization and dashboards with auto-provisioned datasources
+- **Loki**: Log aggregation and storage
+- **Promtail**: Log shipper that collects Laravel logs and sends to Loki
 - **Laravel Metrics Endpoint**: Exposes application metrics in Prometheus format
 
-### Documentation
+### Viewing Logs in Grafana
 
-For detailed monitoring setup and configuration, see [docker/MONITORING.md](docker/MONITORING.md).
+1. Open Grafana at http://localhost:3000
+2. Go to **Explore** (compass icon in sidebar)
+3. Select **Loki** as datasource
+4. Use LogQL queries:
+   - `{job="laravel", type="web_request"}` - View web requests
+   - `{job="laravel", type="api_request"}` - View API requests
+   - `{job="laravel", level_name="ERROR"}` - View errors
 
 ### Running without Docker
 
@@ -334,14 +366,45 @@ docker-compose exec app mysql -u laravel_user -p employee_management
 # Password: laravel_password
 ```
 
+#### Access Redis:
+```bash
+docker-compose exec app redis-cli
+```
+
+#### Setup MinIO bucket:
+```bash
+make minio-setup
+# Or manually:
+docker-compose exec app /var/www/html/docker/setup-minio.sh
+```
+
 #### Check running services:
 ```bash
 docker-compose exec app supervisorctl status
 ```
 
+This will show status of all services:
+- `php-fpm` - PHP FastCGI Process Manager
+- `nginx` - Web server
+- `mysql` - Database server
+- `redis` - Cache server
+- `minio` - Object storage
+- `queue-worker` - Background job processor
+- `prometheus` - Metrics collection
+- `grafana` - Monitoring dashboards
+- `loki` - Log aggregation
+- `promtail` - Log shipper
+
 #### Restart services:
 ```bash
 docker-compose exec app supervisorctl restart all
+```
+
+#### Restart specific service:
+```bash
+docker-compose exec app supervisorctl restart grafana
+docker-compose exec app supervisorctl restart prometheus
+docker-compose exec app supervisorctl restart minio
 ```
 
 ## 📊 Framework Version
@@ -477,7 +540,8 @@ All workspace routes are prefixed with `/api/workspaces/{workspace}`:
 ### Docker Issues:
 
 **Port already in use**:
-- Change the port in `docker-compose.yml` (nginx service ports section)
+- Change the port in `docker-compose.yml` (app service ports section)
+- Common ports: 8000 (app), 3000 (Grafana), 9090 (Prometheus), 9001 (MinIO Console), 9002 (MinIO API)
 
 **Permission errors**:
 ```bash
@@ -485,8 +549,36 @@ docker-compose exec app chmod -R 755 storage bootstrap/cache
 ```
 
 **Database connection errors**:
-- Ensure the database container is running: `docker-compose ps`
-- Check database credentials in `.env` match `docker-compose.yml`
+- Ensure the container is running: `docker-compose ps`
+- Check database credentials in `.env` match the container setup
+- Verify MySQL is running: `docker-compose exec app supervisorctl status mysql`
+
+**Services not starting**:
+```bash
+# Check service status
+docker-compose exec app supervisorctl status
+
+# View service logs
+docker-compose exec app cat /var/log/grafana.err.log
+docker-compose exec app cat /var/log/minio.err.log
+
+# Restart specific service
+docker-compose exec app supervisorctl restart <service-name>
+```
+
+**Grafana not accessible**:
+- Wait 15-20 seconds after container start for Grafana to initialize
+- Check logs: `docker-compose logs app | grep grafana`
+- Verify port 3000 is not used by another service
+
+**MinIO not accessible**:
+- MinIO API is on port 9002 (not 9000, which is used by PHP-FPM)
+- MinIO Console is on port 9001
+- Check logs: `docker-compose logs app | grep minio`
+
+**Cache not updating**:
+- Clear cache: `docker-compose exec app php artisan cache:clear`
+- Cache is automatically invalidated on create/update/delete operations
 
 ### Local Setup Issues:
 
@@ -499,6 +591,26 @@ php -d memory_limit=-1 /usr/local/bin/composer install
 ```bash
 chmod -R 775 storage bootstrap/cache
 ```
+
+## 🔒 Security Features
+
+- **HTTPS Enforcement**: Force HTTPS in production environments
+- **Security Headers**: HSTS, CSP, X-Frame-Options, and more
+- **Rate Limiting**: Protection against brute force attacks
+- **Password Complexity**: Configurable password rules per workspace
+- **Token Rotation**: API tokens rotated on login
+- **Input Validation**: Comprehensive validation and sanitization
+- **SQL Injection Protection**: Parameterized queries throughout
+- **XSS Protection**: Content Security Policy headers
+
+## ⚡ Performance Features
+
+- **Redis Caching**: Intelligent caching with automatic invalidation
+- **Database Indexing**: Optimized queries with proper indexes
+- **Background Jobs**: PDF/Excel exports processed asynchronously
+- **Query Optimization**: Reduced N+1 queries, combined queries
+- **Dashboard Caching**: Cached statistics and chart data
+- **Asset Optimization**: Minified CSS/JS for production
 
 ## 📄 License
 
