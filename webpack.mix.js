@@ -25,4 +25,7 @@ mix.js('resources/js/app.js', 'public/js')
         'resources/css/_modules.css',
         'resources/css/_responsive.css',
     ], 'public/css/custom.css')
+    .options({
+        processCssUrls: false
+    })
     .sourceMaps();
