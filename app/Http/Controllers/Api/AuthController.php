@@ -8,6 +8,7 @@ use App\Models\Workspace;
 use App\Helpers\PasswordHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -28,7 +29,7 @@ class AuthController extends Controller
         ]);
 
         $workspace = Workspace::where('slug', $request->workspace_slug)->first();
-        
+
         if (!$workspace) {
             return response()->json([
                 'message' => 'Workspace not found'
@@ -46,8 +47,8 @@ class AuthController extends Controller
             ]);
         }
 
-        // Revoke all existing tokens (optional - for security)
-        // $user->tokens()->delete();
+        // Revoke all existing tokens for security (token rotation)
+        $user->tokens()->delete();
 
         // Create new token
         $token = $user->createToken('api-token')->plainTextToken;
@@ -121,7 +122,7 @@ class AuthController extends Controller
             $bucketName = $bucketService->getBucketName($workspace->slug);
             $bucketService->createBucket($bucketName);
         } catch (\Exception $e) {
-            \Log::error("Error creating MinIO bucket for workspace '{$workspace->slug}': " . $e->getMessage());
+            Log::error("Error creating MinIO bucket for workspace '{$workspace->slug}': " . $e->getMessage());
         }
 
         // Create token

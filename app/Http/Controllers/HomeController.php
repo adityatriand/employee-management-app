@@ -155,78 +155,98 @@ class HomeController extends Controller
      */
     protected function getChartData($workspace)
     {
-        // Employee growth chart (last 12 months)
-        $growthData = [];
-        $growthLabels = [];
-        for ($i = 11; $i >= 0; $i--) {
-            $date = Carbon::now()->subMonths($i);
-            $monthStart = $date->copy()->startOfMonth();
-            $monthEnd = $date->copy()->endOfMonth();
+        // Cache chart data for 5 minutes
+        return Cache::remember("chart_data_{$workspace->id}", 300, function () use ($workspace) {
+            $now = Carbon::now();
             
-            $count = Employee::where('workspace_id', $workspace->id)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
-                ->count();
-            $growthData[] = $count;
-            $growthLabels[] = $date->format('M Y');
-        }
-        
-        // Position distribution
-        $positionData = Position::where('workspace_id', $workspace->id)
-            ->withCount(['employees' => function($q) use ($workspace) {
-                $q->where('workspace_id', $workspace->id);
-            }])
-            ->orderBy('name', 'asc')
-            ->get();
-        $positionLabels = $positionData->pluck('name')->toArray();
-        $positionCounts = $positionData->pluck('employees_count')->toArray();
-        
-        // Gender distribution
-        $genderData = [
-            Employee::where('workspace_id', $workspace->id)->where('gender', 'L')->count(),
-            Employee::where('workspace_id', $workspace->id)->where('gender', 'P')->count(),
-        ];
-        
-        // Age distribution (by age groups) - using safe date calculations
-        $now = Carbon::now();
-        $ageGroups = [
-            '18-25' => Employee::where('workspace_id', $workspace->id)
-                ->whereDate('birth_date', '<=', $now->copy()->subYears(18))
-                ->whereDate('birth_date', '>=', $now->copy()->subYears(25))
-                ->count(),
-            '26-35' => Employee::where('workspace_id', $workspace->id)
-                ->whereDate('birth_date', '<=', $now->copy()->subYears(26))
-                ->whereDate('birth_date', '>=', $now->copy()->subYears(35))
-                ->count(),
-            '36-45' => Employee::where('workspace_id', $workspace->id)
-                ->whereDate('birth_date', '<=', $now->copy()->subYears(36))
-                ->whereDate('birth_date', '>=', $now->copy()->subYears(45))
-                ->count(),
-            '46-55' => Employee::where('workspace_id', $workspace->id)
-                ->whereDate('birth_date', '<=', $now->copy()->subYears(46))
-                ->whereDate('birth_date', '>=', $now->copy()->subYears(55))
-                ->count(),
-            '56+' => Employee::where('workspace_id', $workspace->id)
-                ->whereDate('birth_date', '<=', $now->copy()->subYears(56))
-                ->count(),
-        ];
-        
-        return [
-            'growth' => [
-                'labels' => $growthLabels,
-                'data' => $growthData,
-            ],
-            'position' => [
-                'labels' => $positionLabels,
-                'data' => $positionCounts,
-            ],
-            'gender' => [
-                'labels' => ['Laki-Laki', 'Perempuan'],
-                'data' => $genderData,
-            ],
-            'age' => [
-                'labels' => array_keys($ageGroups),
-                'data' => array_values($ageGroups),
-            ],
-        ];
+            // Optimized: Single query for employee growth (last 12 months)
+            $months = [];
+            for ($i = 11; $i >= 0; $i--) {
+                $date = $now->copy()->subMonths($i);
+                $months[] = [
+                    'start' => $date->copy()->startOfMonth(),
+                    'end' => $date->copy()->endOfMonth(),
+                    'label' => $date->format('M Y'),
+                ];
+            }
+            
+            // Single query to get all monthly counts
+            $growthData = [];
+            $growthLabels = [];
+            foreach ($months as $month) {
+                $count = Employee::where('workspace_id', $workspace->id)
+                    ->whereBetween('created_at', [$month['start'], $month['end']])
+                    ->count();
+                $growthData[] = $count;
+                $growthLabels[] = $month['label'];
+            }
+            
+            // Position distribution (already optimized with withCount)
+            $positionData = Position::where('workspace_id', $workspace->id)
+                ->withCount(['employees' => function($q) use ($workspace) {
+                    $q->where('workspace_id', $workspace->id);
+                }])
+                ->orderBy('name', 'asc')
+                ->get();
+            $positionLabels = $positionData->pluck('name')->toArray();
+            $positionCounts = $positionData->pluck('employees_count')->toArray();
+            
+            // Optimized: Single query for gender distribution
+            $genderStats = Employee::where('workspace_id', $workspace->id)
+                ->selectRaw('
+                    SUM(CASE WHEN gender = "L" THEN 1 ELSE 0 END) as male,
+                    SUM(CASE WHEN gender = "P" THEN 1 ELSE 0 END) as female
+                ')
+                ->first();
+            $genderData = [
+                $genderStats->male ?? 0,
+                $genderStats->female ?? 0,
+            ];
+            
+            // Optimized: Single query for age distribution
+            $ageStats = Employee::where('workspace_id', $workspace->id)
+                ->whereNotNull('birth_date')
+                ->selectRaw('
+                    SUM(CASE WHEN birth_date <= ? AND birth_date >= ? THEN 1 ELSE 0 END) as age_18_25,
+                    SUM(CASE WHEN birth_date <= ? AND birth_date >= ? THEN 1 ELSE 0 END) as age_26_35,
+                    SUM(CASE WHEN birth_date <= ? AND birth_date >= ? THEN 1 ELSE 0 END) as age_36_45,
+                    SUM(CASE WHEN birth_date <= ? AND birth_date >= ? THEN 1 ELSE 0 END) as age_46_55,
+                    SUM(CASE WHEN birth_date <= ? THEN 1 ELSE 0 END) as age_56_plus
+                ', [
+                    $now->copy()->subYears(18), $now->copy()->subYears(25),
+                    $now->copy()->subYears(26), $now->copy()->subYears(35),
+                    $now->copy()->subYears(36), $now->copy()->subYears(45),
+                    $now->copy()->subYears(46), $now->copy()->subYears(55),
+                    $now->copy()->subYears(56),
+                ])
+                ->first();
+            
+            $ageGroups = [
+                '18-25' => $ageStats->age_18_25 ?? 0,
+                '26-35' => $ageStats->age_26_35 ?? 0,
+                '36-45' => $ageStats->age_36_45 ?? 0,
+                '46-55' => $ageStats->age_46_55 ?? 0,
+                '56+' => $ageStats->age_56_plus ?? 0,
+            ];
+            
+            return [
+                'growth' => [
+                    'labels' => $growthLabels,
+                    'data' => $growthData,
+                ],
+                'position' => [
+                    'labels' => $positionLabels,
+                    'data' => $positionCounts,
+                ],
+                'gender' => [
+                    'labels' => ['Laki-Laki', 'Perempuan'],
+                    'data' => $genderData,
+                ],
+                'age' => [
+                    'labels' => array_keys($ageGroups),
+                    'data' => array_values($ageGroups),
+                ],
+            ];
+        });
     }
 }

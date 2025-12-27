@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Position;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class PositionObserver
 {
@@ -25,6 +26,10 @@ class PositionObserver
             'new_values' => $position->getAttributes(),
             'description' => "Jabatan '{$position->name}' telah ditambahkan",
         ]);
+
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$position->workspace_id}");
+        Cache::forget("positions_count_{$position->workspace_id}");
     }
 
     /**
@@ -54,6 +59,10 @@ class PositionObserver
                 'new_values' => $newValues,
                 'description' => "Jabatan '{$position->name}' telah diupdate",
             ]);
+
+            // Clear positions cache for this workspace
+            Cache::forget("positions_{$position->workspace_id}");
+            Cache::forget("positions_count_{$position->workspace_id}");
         }
     }
 
@@ -74,6 +83,10 @@ class PositionObserver
             'old_values' => $position->getAttributes(),
             'description' => "Jabatan '{$position->name}' telah dihapus",
         ]);
+
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$position->workspace_id}");
+        Cache::forget("positions_count_{$position->workspace_id}");
     }
 
     /**
@@ -93,6 +106,10 @@ class PositionObserver
             'new_values' => $position->getAttributes(),
             'description' => "Jabatan '{$position->name}' telah dipulihkan",
         ]);
+
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$position->workspace_id}");
+        Cache::forget("positions_count_{$position->workspace_id}");
     }
 }
 

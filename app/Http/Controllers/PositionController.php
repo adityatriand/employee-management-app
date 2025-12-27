@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Position;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class PositionController extends Controller
 {
@@ -74,6 +75,10 @@ class PositionController extends Controller
 
         $validated['workspace_id'] = $workspace->id;
         Position::create($validated);
+
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$workspace->id}");
+        Cache::forget("positions_count_{$workspace->id}");
 
         return redirect()
             ->route('workspace.positions.index', ['workspace' => $workspace->slug])
@@ -196,6 +201,10 @@ class PositionController extends Controller
 
         $position->update($validated);
 
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$workspace->id}");
+        Cache::forget("positions_count_{$workspace->id}");
+
         return redirect()
             ->route('workspace.positions.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil diedit');
@@ -240,6 +249,10 @@ class PositionController extends Controller
 
         $position->delete();
 
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$workspace->id}");
+        Cache::forget("positions_count_{$workspace->id}");
+
         return redirect()
             ->route('workspace.positions.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil dihapus (dapat dipulihkan)');
@@ -279,6 +292,10 @@ class PositionController extends Controller
                 ->findOrFail((int)$positionParam);
         }
         $position->restore();
+
+        // Clear positions cache for this workspace
+        Cache::forget("positions_{$workspace->id}");
+        Cache::forget("positions_count_{$workspace->id}");
 
         return redirect()
             ->route('workspace.positions.index', ['workspace' => $workspace->slug])

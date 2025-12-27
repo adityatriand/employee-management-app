@@ -141,6 +141,32 @@ class FileController extends Controller
         $originalName = $uploadedFile->getClientOriginalName();
         $mimeType = $uploadedFile->getMimeType();
         $fileSize = $uploadedFile->getSize();
+        
+        // Validate MIME type based on file_type
+        $allowedMimeTypes = $validated['file_type'] === 'photo'
+            ? ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp']
+            : [
+                // Documents
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-powerpoint',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'text/plain',
+                'text/csv',
+                'application/zip',
+                'application/x-zip-compressed',
+            ];
+        
+        if (!in_array($mimeType, $allowedMimeTypes)) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['file' => 'Jenis file tidak diizinkan. ' . ($validated['file_type'] === 'photo' 
+                    ? 'Foto harus berupa gambar (JPEG, PNG, GIF, WebP).' 
+                    : 'Dokumen harus berupa PDF, Word, Excel, PowerPoint, atau file teks.')]);
+        }
 
         // Generate unique file name
         $fileName = Str::uuid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
