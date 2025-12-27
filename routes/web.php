@@ -85,6 +85,7 @@ Route::prefix('{workspace}')->group(function () {
             Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('workspace.employees.update');
             Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('workspace.employees.destroy');
             Route::post('/employees/{employee}/restore', [EmployeeController::class, 'restore'])->name('workspace.employees.restore');
+            Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword'])->name('workspace.employees.reset-password');
             
             // Export routes (admin only)
             Route::get('/employees/export/pdf', [EmployeeController::class, 'exportPdf'])->name('workspace.employees.export.pdf');

@@ -75,7 +75,7 @@ class EmployeeController extends Controller
                 ->orderBy('name', 'asc')
                 ->get();
         });
-        
+
         // Calculate filter status
         $hasFilters = $request->filled('search') ||
                      $request->filled('position_id') ||
@@ -84,14 +84,14 @@ class EmployeeController extends Controller
                      $request->filled('birth_date_to') ||
                      $request->filled('created_from') ||
                      $request->filled('created_to');
-        
+
         $filterCount = 0;
         if ($request->filled('search')) $filterCount++;
         if ($request->filled('position_id')) $filterCount++;
         if ($request->filled('gender')) $filterCount++;
         if ($request->filled('birth_date_from') || $request->filled('birth_date_to')) $filterCount++;
         if ($request->filled('created_from') || $request->filled('created_to')) $filterCount++;
-        
+
         return view('employees.index', compact('workspace', 'employees', 'positions', 'hasFilters', 'filterCount'));
     }
 
@@ -110,10 +110,10 @@ class EmployeeController extends Controller
         $positions = Cache::remember("positions_{$workspace->id}", 3600, function () use ($workspace) {
             return Position::where('workspace_id', $workspace->id)->orderBy('name', 'asc')->get();
         });
-        
+
         // Get password requirements for display
         $passwordDescription = \App\Helpers\PasswordHelper::getPasswordDescription($workspace->id);
-        
+
         return view('employees.create', compact('positions', 'workspace', 'passwordDescription'));
     }
 
@@ -158,7 +158,7 @@ class EmployeeController extends Controller
         $position = \App\Models\Position::where('id', $validated['position_id'])
             ->where('workspace_id', $workspace->id)
             ->first();
-        
+
         if (!$position) {
             return back()->withErrors(['position_id' => 'Jabatan tidak valid untuk workspace ini'])->withInput();
         }
@@ -176,19 +176,19 @@ class EmployeeController extends Controller
                     ['password' => $request->password],
                     ['password' => ['required', $passwordRule]]
                 );
-                
+
                 if ($validator->fails()) {
                     return back()
                         ->withErrors($validator)
                         ->withInput()
                         ->with('password_error', 'Password tidak memenuhi persyaratan. ' . \App\Helpers\PasswordHelper::getPasswordDescription($workspace->id));
                 }
-                
+
                 $password = $request->password;
             } else {
                 // Use default password from settings or generate one
                 $defaultPassword = \App\Models\Setting::get('employee_default_password', '', $workspace->id);
-                
+
                 if (!empty($defaultPassword)) {
                     $password = $defaultPassword;
                 } else {
@@ -197,7 +197,7 @@ class EmployeeController extends Controller
                     $generatedPassword = $password; // Store to show to admin
                 }
             }
-            
+
             $user = \App\Models\User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -213,11 +213,11 @@ class EmployeeController extends Controller
             $file = $request->file('photo');
             $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'photos/' . $fileName;
-            
+
             // Upload to MinIO using workspace-specific bucket
             $workspaceDisk = $workspace->getStorageDisk();
             $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
-            
+
             // Create file record
             $fileRecord = \App\Models\File::create([
                 'name' => $file->getClientOriginalName(),
@@ -231,28 +231,28 @@ class EmployeeController extends Controller
                 'uploaded_by' => auth()->id(),
                 'workspace_id' => $workspace->id,
             ]);
-            
+
             // Store file ID in employee record (for backward compatibility)
             $validated['photo'] = $fileRecord->id;
         }
-        
+
         // Create employee with workspace_id and user_id
         $validated['workspace_id'] = $workspace->id;
         if ($user) {
             $validated['user_id'] = $user->id;
         }
         unset($validated['email']); // Remove email from employee fillable
-        
+
         $employee = Employee::create($validated);
-        
+
         // Link file to employee
         if ($fileRecord) {
             $fileRecord->update(['employee_id' => $employee->id]);
         }
-        
+
         $workspaceSlug = $workspace->slug;
         $message = 'Data berhasil ditambahkan';
-        
+
         if ($user) {
             if ($generatedPassword) {
                 // Show generated password to admin
@@ -266,7 +266,7 @@ class EmployeeController extends Controller
                 $message .= '. Akun pengguna telah dibuat dengan email: ' . $user->email . ' (password sesuai yang Anda set)';
             }
         }
-        
+
         return redirect()
             ->route('workspace.employees.index', ['workspace' => $workspaceSlug])
             ->with('success', $message);
@@ -289,7 +289,7 @@ class EmployeeController extends Controller
         // Get employee from route parameters - Laravel might pass model or ID
         $routeParams = $request->route()->parameters();
         $employeeParam = $routeParams['employee'] ?? $employee;
-        
+
         // If it's already an Employee model instance, use it; otherwise find by ID
         if ($employeeParam instanceof Employee) {
             $employee = $employeeParam;
@@ -301,15 +301,15 @@ class EmployeeController extends Controller
             $employee = Employee::where('workspace_id', $workspace->id)
                 ->findOrFail((int)$employeeParam);
         }
-        
+
         // Load relationships
         $employee->load(['position', 'files', 'assets', 'user']);
-        
+
         // Regular users can only view their own profile
         if (auth()->user()->level == 0 && $employee->user_id !== auth()->id()) {
             abort(403, 'Anda tidak memiliki akses ke profil ini');
         }
-        
+
         $files = $employee->files()->orderBy('created_at', 'desc')->get();
         $assets = $employee->assets()->orderBy('assigned_date', 'desc')->get();
         return view('employees.show', compact('workspace', 'employee', 'files', 'assets'));
@@ -332,7 +332,7 @@ class EmployeeController extends Controller
         // Get employee from route parameters - Laravel might pass model or ID
         $routeParams = $request->route()->parameters();
         $employeeParam = $routeParams['employee'] ?? $employee;
-        
+
         // If it's already an Employee model instance, use it; otherwise find by ID
         if ($employeeParam instanceof Employee) {
             $employee = $employeeParam;
@@ -344,7 +344,7 @@ class EmployeeController extends Controller
             $employee = Employee::where('workspace_id', $workspace->id)
                 ->findOrFail((int)$employeeParam);
         }
-        
+
         // Regular users can only edit their own profile
         if (auth()->user()->level == 0 && $employee->user_id !== auth()->id()) {
             abort(403, 'Anda tidak memiliki akses untuk mengedit profil ini');
@@ -372,7 +372,7 @@ class EmployeeController extends Controller
         // Get employee from route parameters - Laravel might pass model or ID
         $routeParams = $request->route()->parameters();
         $employeeParam = $routeParams['employee'] ?? $employee;
-        
+
         // If it's already an Employee model instance, use it; otherwise find by ID
         if ($employeeParam instanceof Employee) {
             $employee = $employeeParam;
@@ -384,7 +384,7 @@ class EmployeeController extends Controller
             $employee = Employee::where('workspace_id', $workspace->id)
                 ->findOrFail((int)$employeeParam);
         }
-        
+
         // Regular users can only edit their own profile
         if (auth()->user()->level == 0 && $employee->user_id !== auth()->id()) {
             abort(403, 'Anda tidak memiliki akses untuk mengedit profil ini');
@@ -419,7 +419,7 @@ class EmployeeController extends Controller
             $file = $request->file('photo');
             $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'photos/' . $fileName;
-            
+
             // Upload to MinIO using workspace-specific bucket
             $workspace = $request->get('workspace');
             if (!$workspace) {
@@ -427,7 +427,7 @@ class EmployeeController extends Controller
             }
             $workspaceDisk = $workspace->getStorageDisk();
             $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
-            
+
             // Create file record
             $fileRecord = \App\Models\File::create([
                 'name' => $file->getClientOriginalName(),
@@ -441,7 +441,7 @@ class EmployeeController extends Controller
                 'uploaded_by' => auth()->id(),
                 'workspace_id' => $workspace->id,
             ]);
-            
+
             // Store file ID in employee record (for backward compatibility)
             $validated['photo'] = $fileRecord->id;
         }
@@ -450,14 +450,14 @@ class EmployeeController extends Controller
 
         $workspaceSlug = $workspace->slug;
         $workspaceSlug = $workspace->slug;
-        
+
         // If regular user editing own profile, redirect to dashboard
         if (auth()->user()->level == 0 && $employee->user_id === auth()->id()) {
             return redirect()
                 ->route('workspace.dashboard', ['workspace' => $workspaceSlug])
                 ->with('success', 'Profil berhasil diperbarui');
         }
-        
+
         return redirect()
             ->route('workspace.employees.index', ['workspace' => $workspaceSlug])
             ->with('success', 'Data berhasil diedit');
@@ -472,7 +472,7 @@ class EmployeeController extends Controller
     public function editProfile(Request $request)
     {
         $user = auth()->user();
-        
+
         // Only regular users can access this
         if ($user->level != 0) {
             abort(403, 'Hanya pengguna biasa yang dapat mengakses halaman ini');
@@ -500,7 +500,7 @@ class EmployeeController extends Controller
     public function updateProfile(Request $request)
     {
         $user = auth()->user();
-        
+
         // Only regular users can access this
         if ($user->level != 0) {
             abort(403, 'Hanya pengguna biasa yang dapat mengakses halaman ini');
@@ -543,11 +543,11 @@ class EmployeeController extends Controller
             $file = $request->file('photo');
             $fileName = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $file->getClientOriginalExtension();
             $path = 'photos/' . $fileName;
-            
+
             // Upload to MinIO using workspace-specific bucket
             $workspaceDisk = $workspace->getStorageDisk();
             $workspaceDisk->put($path, file_get_contents($file->getRealPath()));
-            
+
             // Create file record
             $fileRecord = \App\Models\File::create([
                 'name' => $file->getClientOriginalName(),
@@ -560,7 +560,7 @@ class EmployeeController extends Controller
                 'workspace_id' => $workspace->id,
                 'uploaded_by' => auth()->id(),
             ]);
-            
+
             // Store file ID in employee record (for backward compatibility)
             $validated['photo'] = $fileRecord->id;
         }
@@ -590,7 +590,7 @@ class EmployeeController extends Controller
         // Get employee from route parameters - Laravel might pass model or ID
         $routeParams = $request->route()->parameters();
         $employeeParam = $routeParams['employee'] ?? $employee;
-        
+
         // If it's already an Employee model instance, use it; otherwise find by ID
         if ($employeeParam instanceof Employee) {
             $employee = $employeeParam;
@@ -602,7 +602,7 @@ class EmployeeController extends Controller
             $employee = Employee::where('workspace_id', $workspace->id)
                 ->findOrFail((int)$employeeParam);
         }
-        
+
         // Soft delete (photo file is kept for potential restore)
         $employee->delete();
 
@@ -733,7 +733,7 @@ class EmployeeController extends Controller
         }
 
         $filePath = storage_path('app/' . $exportInfo['filename']);
-        
+
         // Delete from cache after download
         Cache::forget($cacheKey);
 
@@ -808,7 +808,7 @@ class EmployeeController extends Controller
         }
 
         $filePath = storage_path('app/' . $exportInfo['filename']);
-        
+
         // Delete from cache after download
         Cache::forget($cacheKey);
 
@@ -832,7 +832,7 @@ class EmployeeController extends Controller
         // Get employee from route parameters - Laravel might pass model or ID
         $routeParams = $request->route()->parameters();
         $employeeParam = $routeParams['employee'] ?? $employee;
-        
+
         // If it's already an Employee model instance, use it; otherwise find by ID
         if ($employeeParam instanceof Employee) {
             $employee = $employeeParam;
@@ -851,6 +851,76 @@ class EmployeeController extends Controller
         return redirect()
             ->route('workspace.employees.index', ['workspace' => $workspace->slug])
             ->with('success', 'Data berhasil dipulihkan');
+    }
+
+    /**
+     * Reset password for employee's user account
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $employee Employee ID or Employee model
+     * @return \Illuminate\Http\Response
+     */
+    public function resetPassword(Request $request, $employee)
+    {
+        $workspace = $request->get('workspace');
+        if (!$workspace) {
+            abort(404, 'Workspace not found');
+        }
+
+        // Get employee from route parameters
+        $routeParams = $request->route()->parameters();
+        $employeeParam = $routeParams['employee'] ?? $employee;
+
+        if ($employeeParam instanceof Employee) {
+            $employee = $employeeParam;
+            if ($employee->workspace_id !== $workspace->id) {
+                abort(404, 'Employee not found');
+            }
+        } else {
+            $employee = Employee::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$employeeParam);
+        }
+
+        // Check if employee has a user account
+        if (!$employee->user_id || !$employee->user) {
+            return back()->with('error', 'Pegawai ini tidak memiliki akun pengguna.');
+        }
+
+        // Generate new password using same logic as employee creation
+        $defaultPassword = \App\Models\Setting::get('employee_default_password', '', $workspace->id);
+
+        if (!empty($defaultPassword)) {
+            $newPassword = $defaultPassword;
+        } else {
+            // Generate password that meets requirements
+            $newPassword = \App\Helpers\PasswordHelper::generatePassword($workspace->id);
+        }
+
+        // Update user password
+        $employee->user->update([
+            'password' => \Illuminate\Support\Facades\Hash::make($newPassword),
+        ]);
+
+        // Log activity
+        \App\Models\ActivityLog::create([
+            'workspace_id' => $workspace->id,
+            'user_id' => auth()->id(),
+            'action' => 'reset_password',
+            'model_type' => 'App\Models\User',
+            'model_id' => $employee->user->id,
+            'description' => "Password untuk {$employee->user->email} telah direset",
+        ]);
+
+        // Return JSON response with the new password for display
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Password berhasil direset',
+                'password' => $newPassword,
+            ]);
+        }
+
+        return back()->with('success', 'Password berhasil direset')->with('new_password', $newPassword);
     }
 }
 

@@ -36,12 +36,15 @@
                 </div>
                 <h3 class="mb-2">{{ $employee->name }}</h3>
                 <p class="text-muted mb-3">
+                   <i class="oi oi-envelope"></i> {{ $employee->user->email }}
+                </p>
+                <p class="text-muted mb-3">
                     <span class="badge bg-info fs-6">{{ $employee->position->name ?? '-' }}</span>
                 </p>
                 <div class="profile-stats">
                     <div class="stat-item">
                         <i class="oi oi-person"></i>
-                        <div>
+                        <div class="text-start">
                             <div class="stat-label">Jenis Kelamin</div>
                             <div class="stat-value">
                                 @if($employee->gender == 'L')
@@ -54,7 +57,7 @@
                     </div>
                     <div class="stat-item">
                         <i class="oi oi-calendar"></i>
-                        <div>
+                        <div class="text-start">
                             <div class="stat-label">Tanggal Lahir</div>
                             <div class="stat-value">{{ $employee->birth_date->format('d F Y') }}</div>
                             <div class="stat-subvalue">({{ $employee->birth_date->age }} tahun)</div>
@@ -129,30 +132,32 @@
                 </div>
             </div>
         </div>
+
+        @if(auth()->user()->level == 1)
+            <div class="d-flex gap-2 justify-content-start">
+                <a href="{{ route('workspace.employees.edit', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" class="btn btn-primary">
+                    <i class="oi oi-pencil"></i> Edit Pegawai
+                </a>
+                @if($employee->user_id && $employee->user)
+                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
+                    <i class="oi oi-reload"></i> Reset Password
+                </button>
+                @endif
+                <form action="{{ route('workspace.employees.destroy', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}"
+                    method="POST"
+                    class="d-inline"
+                    onsubmit="return confirm('Apakah Anda yakin ingin menghapus pegawai ini?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">
+                        <i class="oi oi-trash"></i> Hapus Pegawai
+                    </button>
+                </form>
+            </div>
+        @endif
     </div>
 </div>
 
-@if(auth()->user()->level == 1)
-<div class="card mt-4">
-    <div class="card-body">
-        <div class="d-flex gap-2 justify-content-end">
-            <a href="{{ route('workspace.employees.edit', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" class="btn btn-primary">
-                <i class="oi oi-pencil"></i> Edit Pegawai
-            </a>
-            <form action="{{ route('workspace.employees.destroy', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}"
-                  method="POST"
-                  class="d-inline"
-                  onsubmit="return confirm('Apakah Anda yakin ingin menghapus pegawai ini?');">
-                @csrf
-                @method('DELETE')
-                <button type="submit" class="btn btn-danger">
-                    <i class="oi oi-trash"></i> Hapus Pegawai
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-@endif
 
 <!-- Files Section -->
 <div class="card mt-4">
@@ -348,5 +353,185 @@
         @endif
     </div>
 </div>
+
+<!-- Reset Password Modal -->
+@if(auth()->user()->level == 1 && $employee->user_id && $employee->user)
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Reset Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="resetPasswordForm" action="{{ route('workspace.employees.reset-password', ['workspace' => $workspace->slug, 'employee' => $employee->id]) }}" method="POST">
+                @csrf
+                <div class="modal-body">
+                    <p>Apakah Anda yakin ingin mereset password untuk <strong>{{ $employee->user->email }}</strong>?</p>
+                    <p class="text-muted small">Password akan direset ke password default atau password yang di-generate otomatis sesuai pengaturan workspace.</p>
+
+                    <div id="passwordResult" style="display: none;">
+                        <div class="alert alert-success">
+                            <strong>Password berhasil direset!</strong>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label fw-bold">Password Baru:</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="newPassword" readonly>
+                                <button class="btn btn-outline-secondary" type="button" id="copyPasswordBtn">
+                                    <i class="oi oi-clipboard"></i> Copy
+                                </button>
+                            </div>
+                            <small class="text-muted">Salin password ini dan kirimkan ke pengguna. Password ini tidak akan ditampilkan lagi.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-warning" id="resetPasswordBtn">
+                        <i class="oi oi-reload"></i> Reset Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const resetPasswordForm = document.getElementById('resetPasswordForm');
+    const resetPasswordBtn = document.getElementById('resetPasswordBtn');
+    const passwordResult = document.getElementById('passwordResult');
+    const newPasswordInput = document.getElementById('newPassword');
+    const copyPasswordBtn = document.getElementById('copyPasswordBtn');
+    const resetPasswordModal = document.getElementById('resetPasswordModal');
+
+    if (resetPasswordForm) {
+        resetPasswordForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Disable button during request
+            resetPasswordBtn.disabled = true;
+            resetPasswordBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
+
+            fetch(this.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show password result
+                    passwordResult.style.display = 'block';
+                    newPasswordInput.value = data.password;
+
+                    // Hide the form submit button
+                    resetPasswordBtn.style.display = 'none';
+
+                    // Scroll to password result
+                    passwordResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    alert('Terjadi kesalahan: ' + (data.message || 'Gagal mereset password'));
+                    resetPasswordBtn.disabled = false;
+                    resetPasswordBtn.innerHTML = '<i class="oi oi-reload"></i> Reset Password';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat mereset password');
+                resetPasswordBtn.disabled = false;
+                resetPasswordBtn.innerHTML = '<i class="oi oi-reload"></i> Reset Password';
+            });
+        });
+    }
+
+    // Copy password functionality
+    if (copyPasswordBtn) {
+        copyPasswordBtn.addEventListener('click', function() {
+            const password = newPasswordInput.value;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(password).then(function() {
+                    const originalText = copyPasswordBtn.innerHTML;
+                    copyPasswordBtn.innerHTML = '<i class="oi oi-check"></i> Copied!';
+                    copyPasswordBtn.classList.add('btn-success');
+                    copyPasswordBtn.classList.remove('btn-outline-secondary');
+
+                    setTimeout(function() {
+                        copyPasswordBtn.innerHTML = originalText;
+                        copyPasswordBtn.classList.remove('btn-success');
+                        copyPasswordBtn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Failed to copy:', err);
+                    fallbackCopyTextToClipboard(password);
+                });
+            } else {
+                fallbackCopyTextToClipboard(password);
+            }
+        });
+    }
+
+    // Fallback copy function for older browsers
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                const originalText = copyPasswordBtn.innerHTML;
+                copyPasswordBtn.innerHTML = '<i class="oi oi-check"></i> Copied!';
+                copyPasswordBtn.classList.add('btn-success');
+                copyPasswordBtn.classList.remove('btn-outline-secondary');
+
+                setTimeout(function() {
+                    copyPasswordBtn.innerHTML = originalText;
+                    copyPasswordBtn.classList.remove('btn-success');
+                    copyPasswordBtn.classList.add('btn-outline-secondary');
+                }, 2000);
+            } else {
+                alert('Gagal menyalin password. Silakan salin manual: ' + text);
+            }
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+            alert('Gagal menyalin password. Silakan salin manual: ' + text);
+        }
+
+        document.body.removeChild(textArea);
+    }
+
+    // Reset modal when closed
+    if (resetPasswordModal) {
+        resetPasswordModal.addEventListener('hidden.bs.modal', function() {
+            passwordResult.style.display = 'none';
+            resetPasswordBtn.style.display = 'block';
+            resetPasswordBtn.disabled = false;
+            resetPasswordBtn.innerHTML = '<i class="oi oi-reload"></i> Reset Password';
+            newPasswordInput.value = '';
+        });
+    }
+});
+</script>
+@endpush
 @endsection
 
