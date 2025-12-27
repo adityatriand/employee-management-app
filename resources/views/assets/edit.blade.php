@@ -15,7 +15,7 @@
 </div>
 
 <div class="row">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Form Edit Aset</h5>
@@ -283,7 +283,7 @@
                         <select class="form-select searchable-select @error('assigned_to') is-invalid @enderror" id="assigned_to" name="assigned_to">
                             <option value="">Tidak Ditugaskan</option>
                             @foreach($employees as $employee)
-                            <option value="{{ $employee->id }}" {{ old('assigned_to', $selectedEmployeeId) == $employee->id ? 'selected' : '' }}>
+                            <option value="{{ $employee->id }}" {{ old('assigned_to', $asset->assigned_to) == $employee->id ? 'selected' : '' }}>
                                 {{ $employee->name }}
                             </option>
                             @endforeach

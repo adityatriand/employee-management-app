@@ -262,17 +262,33 @@ class AssetController extends Controller
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed $asset Asset ID or Asset model (from route model binding)
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit(Request $request, $asset)
     {
         $workspace = $request->get('workspace');
         if (!$workspace) {
             abort(404, 'Workspace not found');
         }
 
-        $asset = Asset::where('workspace_id', $workspace->id)->findOrFail($id);
+        // Get asset from route parameters - Laravel might pass model or ID
+        $routeParams = $request->route()->parameters();
+        $assetParam = $routeParams['asset'] ?? $asset;
+
+        // If it's already an Asset model instance, use it; otherwise find by ID
+        if ($assetParam instanceof Asset) {
+            $asset = $assetParam;
+            // Verify workspace access
+            if ($asset->workspace_id !== $workspace->id) {
+                abort(404, 'Asset not found');
+            }
+        } else {
+            $asset = Asset::where('workspace_id', $workspace->id)
+                ->findOrFail((int)$assetParam);
+        }
+
         $employees = Employee::where('workspace_id', $workspace->id)->orderBy('name')->get();
 
         return view('assets.edit', compact('workspace', 'asset', 'employees'));
