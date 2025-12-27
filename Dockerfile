@@ -18,10 +18,85 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     default-mysql-server \
     default-mysql-client \
+    redis-server \
+    wget \
+    unzip \
     && docker-php-ext-configure zip \
     && docker-php-ext-install zip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install MinIO binary
+RUN wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio \
+    && chmod +x /usr/local/bin/minio \
+    || echo "MinIO download failed, will use external MinIO service"
+
+# Install Prometheus binary
+RUN wget -q https://github.com/prometheus/prometheus/releases/download/v2.48.0/prometheus-2.48.0.linux-amd64.tar.gz -O /tmp/prometheus.tar.gz \
+    && tar -xzf /tmp/prometheus.tar.gz -C /tmp \
+    && mv /tmp/prometheus-2.48.0.linux-amd64/prometheus /usr/local/bin/prometheus \
+    && mv /tmp/prometheus-2.48.0.linux-amd64/promtool /usr/local/bin/promtool \
+    && chmod +x /usr/local/bin/prometheus /usr/local/bin/promtool \
+    && rm -rf /tmp/prometheus* \
+    || echo "Prometheus download failed"
+
+# Install Grafana binary
+RUN GRAFANA_VERSION="10.2.2" && \
+    GRAFANA_URL="https://dl.grafana.com/oss/release/grafana-${GRAFANA_VERSION}.linux-amd64.tar.gz" && \
+    (wget -q --timeout=30 --tries=3 "$GRAFANA_URL" -O /tmp/grafana.tar.gz || \
+     curl -fL --connect-timeout 30 --max-time 300 "$GRAFANA_URL" -o /tmp/grafana.tar.gz) && \
+    tar -xzf /tmp/grafana.tar.gz -C /tmp && \
+    GRAFANA_DIR=$(find /tmp -maxdepth 1 -type d -name "grafana-*" | head -1) && \
+    cp "$GRAFANA_DIR/bin/grafana" /usr/local/bin/ 2>/dev/null || true && \
+    cp "$GRAFANA_DIR/bin/grafana-server" /usr/local/bin/ && \
+    cp "$GRAFANA_DIR/bin/grafana-cli" /usr/local/bin/ && \
+    chmod +x /usr/local/bin/grafana* && \
+    mkdir -p /etc/grafana /var/lib/grafana /usr/share/grafana && \
+    cp -r "$GRAFANA_DIR/public" /usr/share/grafana/ 2>/dev/null || true && \
+    cp -r "$GRAFANA_DIR/conf" /usr/share/grafana/ 2>/dev/null || true && \
+    rm -rf /tmp/grafana*
+
+
+# Install Loki binary
+RUN wget -q https://github.com/grafana/loki/releases/download/v2.9.2/loki-linux-amd64.zip -O /tmp/loki.zip \
+    && unzip -q /tmp/loki.zip -d /tmp \
+    && mv /tmp/loki-linux-amd64 /usr/local/bin/loki \
+    && chmod +x /usr/local/bin/loki \
+    && rm -f /tmp/loki.zip \
+    || echo "Loki download failed"
+
+# Install Promtail binary (detect architecture)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        PROMTAIL_ARCH="arm64"; \
+    else \
+        PROMTAIL_ARCH="amd64"; \
+    fi && \
+    wget -q "https://github.com/grafana/loki/releases/download/v2.9.2/promtail-linux-${PROMTAIL_ARCH}.zip" -O /tmp/promtail.zip \
+    && unzip -q /tmp/promtail.zip -d /tmp \
+    && mv /tmp/promtail-linux-${PROMTAIL_ARCH} /usr/local/bin/promtail \
+    && chmod +x /usr/local/bin/promtail \
+    && rm -f /tmp/promtail.zip \
+    || echo "Promtail download failed"
+
+# Create Redis user and directories
+RUN useradd -r -s /bin/false redis || true \
+    && mkdir -p /var/lib/redis /var/log/redis \
+    && chown -R redis:redis /var/lib/redis /var/log/redis || true
+
+# Create MinIO directories
+RUN mkdir -p /var/lib/minio /var/log/minio \
+    && chown -R root:root /var/lib/minio /var/log/minio
+
+# Create monitoring service directories
+RUN mkdir -p /var/lib/prometheus /var/log/prometheus \
+    && mkdir -p /var/lib/grafana /var/log/grafana /etc/grafana /usr/share/grafana \
+    && mkdir -p /var/lib/loki /var/log/loki \
+    && mkdir -p /var/log/promtail \
+    && chown -R root:root /var/lib/prometheus /var/log/prometheus \
+    && chown -R root:root /var/lib/grafana /var/log/grafana /etc/grafana /usr/share/grafana \
+    && chown -R root:root /var/lib/loki /var/log/loki \
+    && chown -R root:root /var/log/promtail
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
@@ -54,6 +129,9 @@ RUN rm -f /etc/nginx/sites-enabled/default && \
     ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/php/local.ini /usr/local/etc/php/conf.d/local.ini
+COPY docker/grafana/grafana.ini /etc/grafana/grafana.ini
+COPY docker/grafana/provisioning /etc/grafana/provisioning
+COPY docker/grafana/dashboards /var/lib/grafana/dashboards
 
 # Create MySQL directories and set permissions
 RUN mkdir -p /var/lib/mysql /var/run/mysqld /var/log/mysql \
@@ -90,6 +168,20 @@ if [ ! -f "public/mix-manifest.json" ] && [ ! -f "public/build/manifest.json" ];
     npm run production 2>&1 || npm run dev 2>&1 || echo "Asset build failed, continuing..."\n\
 fi\n\
 \n\
+# Initialize Redis data directory\n\
+mkdir -p /var/lib/redis\n\
+chown -R redis:redis /var/lib/redis 2>/dev/null || chown -R 999:999 /var/lib/redis 2>/dev/null || true\n\
+\n\
+# Initialize MinIO data directory\n\
+mkdir -p /var/lib/minio\n\
+chown -R root:root /var/lib/minio 2>/dev/null || true\n\
+chmod 755 /var/lib/minio 2>/dev/null || true\n\
+\n\
+# Initialize monitoring directories\n\
+mkdir -p /var/lib/prometheus /var/lib/grafana /var/lib/loki\n\
+chown -R root:root /var/lib/prometheus /var/lib/grafana /var/lib/loki 2>/dev/null || true\n\
+chmod 755 /var/lib/prometheus /var/lib/grafana /var/lib/loki 2>/dev/null || true\n\
+\n\
 # Start MySQL\n\
 echo "Starting MySQL..."\n\
 service mysql start 2>&1 || mysqld_safe --user=mysql &\n\
@@ -111,6 +203,7 @@ mysql -uroot -e "GRANT ALL PRIVILEGES ON employee_management.* TO '\''laravel_us
 mysql -uroot -e "FLUSH PRIVILEGES;" 2>/dev/null || true\n\
 \n\
 # Start supervisor (this must succeed)\n\
+# Supervisor will start: PHP-FPM, Nginx, MySQL, Redis, MinIO, Queue Worker\n\
 echo "Starting services with supervisor..."\n\
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /start.sh \
     && chmod +x /start.sh
