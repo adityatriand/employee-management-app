@@ -47,12 +47,12 @@ SESSION_LIFETIME=120
 SANCTUM_TOKEN_EXPIRATION=1440
 
 # MinIO Configuration (set automatically in Docker via docker-compose.yml)
-MINIO_ENDPOINT=http://minio:9000
+MINIO_ENDPOINT=http://127.0.0.1:9002
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin123
 MINIO_BUCKET=workforcehub
 MINIO_REGION=us-east-1
-MINIO_URL=http://localhost:9000
+MINIO_URL=http://localhost:9002
 EOF
     fi
     echo "✅ .env file created"
@@ -123,14 +123,15 @@ echo "✅ Monitoring directories ready"
 
 # Setup MinIO
 echo "📦 Setting up MinIO..."
-if docker-compose ps minio 2>/dev/null | grep -q "Up"; then
-    echo "   MinIO container is running, setting up bucket..."
+# Check if MinIO is running (either as separate container or inside app container)
+if docker-compose ps minio 2>/dev/null | grep -q "Up" || docker-compose exec -T app supervisorctl status minio 2>/dev/null | grep -q "RUNNING"; then
+    echo "   MinIO is running, setting up bucket..."
     # Copy setup script to container and execute
     docker cp docker/setup-minio.sh app:/tmp/setup-minio.sh 2>/dev/null || {
         echo "   Creating setup script in container..."
         docker-compose exec -T app bash -c 'cat > /tmp/setup-minio.sh << "SCRIPTEOF"
 #!/bin/bash
-MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://minio:9000}"
+        MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://127.0.0.1:9002}"
 MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-minioadmin}"
 MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-minioadmin123}"
 MINIO_BUCKET="${MINIO_BUCKET:-workforcehub}"
@@ -167,8 +168,17 @@ chmod +x /tmp/setup-minio.sh'
     }
     docker-compose exec -T app /tmp/setup-minio.sh || echo "⚠️  MinIO setup had issues, but continuing..."
 else
-    echo "⚠️  MinIO container is not running. Start it with: docker-compose up -d minio"
-    echo "   Then create bucket manually via MinIO Console: http://localhost:9001"
+    echo "⚠️  MinIO is not running. Waiting a bit more for it to start..."
+    sleep 10
+    # Try again with embedded MinIO
+    if docker-compose exec -T app supervisorctl status minio 2>/dev/null | grep -q "RUNNING"; then
+        echo "   MinIO is now running, setting up bucket..."
+        docker-compose exec -T app /tmp/setup-minio.sh || echo "⚠️  MinIO setup had issues, but continuing..."
+    else
+        echo "⚠️  MinIO is still not running. Check supervisor logs:"
+        echo "   docker-compose exec app supervisorctl tail -f minio"
+        echo "   Or create bucket manually via MinIO Console: http://localhost:9001"
+    fi
 fi
 
 # Wait for monitoring services to be ready

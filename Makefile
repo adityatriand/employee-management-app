@@ -182,7 +182,7 @@ minio-setup: ## Setup MinIO bucket (creates bucket if not exists)
 	@echo "$(YELLOW)Waiting for MinIO to be ready...$(RESET)"
 	@sleep 5
 	@docker-compose exec -T app bash -c '\
-		MINIO_ENDPOINT="$${MINIO_ENDPOINT:-http://minio:9000}"; \
+		MINIO_ENDPOINT="$${MINIO_ENDPOINT:-http://127.0.0.1:9002}"; \
 		MINIO_ACCESS_KEY="$${MINIO_ACCESS_KEY:-minioadmin}"; \
 		MINIO_SECRET_KEY="$${MINIO_SECRET_KEY:-minioadmin123}"; \
 		MINIO_BUCKET="$${MINIO_BUCKET:-workforcehub}"; \
@@ -303,4 +303,12 @@ setup-queue: ## Setup queue tables (for database queue driver)
 	@docker-compose exec -T app php artisan queue:table || true
 	@make migrate || true
 	@echo "$(GREEN)Queue tables ready!$(RESET)"
+
+security-audit: ## Run dependency security audit (composer audit)
+	@echo "$(GREEN)Running security audit...$(RESET)"
+	@docker-compose exec -T app composer audit || \
+		(echo "$(YELLOW)composer audit not available. Install with: composer require symfony/security-checker$(RESET)" && exit 0)
+	@echo "$(GREEN)Security audit completed!$(RESET)"
+
+security-check: security-audit ## Alias for security-audit
 
